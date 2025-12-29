@@ -1,5 +1,8 @@
 # gemini-diagram-mcp
 
+[![npm version](https://badge.fury.io/js/gemini-diagram-mcp.svg)](https://www.npmjs.com/package/gemini-diagram-mcp)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 MCP server for generating diagrams, charts, and visualizations using Google Gemini's native image generation.
 
 ## Features
@@ -144,6 +147,27 @@ npm install -g gemini-diagram-mcp
 
 Then use `"command": "gemini-diagram-mcp"` instead of npx.
 
+### Alternative: From Source
+
+```bash
+git clone https://github.com/arunsanna/gemini-diagram-mcp.git
+cd gemini-diagram-mcp
+npm install && npm run build
+```
+
+Then use:
+```json
+{
+  "gemini-image": {
+    "command": "node",
+    "args": ["/path/to/gemini-diagram-mcp/dist/index.js"],
+    "env": {
+      "GOOGLE_API_KEY": "your-api-key"
+    }
+  }
+}
+```
+
 ## Usage Examples
 
 ```
@@ -206,10 +230,16 @@ src/
 ## Development
 
 ```bash
+git clone https://github.com/arunsanna/gemini-diagram-mcp.git
+cd gemini-diagram-mcp
 npm install      # Install dependencies
 npm run build    # Build TypeScript
 npm run dev      # Watch mode
 ```
+
+## Contributing
+
+Contributions welcome! Please open an issue or PR on [GitHub](https://github.com/arunsanna/gemini-diagram-mcp).
 
 ## License
 

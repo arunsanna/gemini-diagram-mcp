@@ -11,7 +11,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import * as path from "node:path";
 
-import { GeminiImageClient, detectType } from "./gemini/client.js";
+import { GeminiImageClient, analyzePrompt, DIAGRAM_TYPES } from "./gemini/client.js";
 import { loadSession, saveSession, clearSession } from "./utils/session.js";
 
 // Validate environment on startup
@@ -36,9 +36,28 @@ const GenerateImageSchema = z.object({
     .optional()
     .describe("Output filename (auto-generated if not provided)"),
   type: z
-    .enum(["diagram", "chart", "visualization", "auto"])
+    .enum([
+      "auto",
+      "chart",
+      "comparison",
+      "flow",
+      "architecture",
+      "timeline",
+      "hierarchy",
+      "matrix",
+      "hero",
+      "visualization",
+    ])
     .default("auto")
-    .describe("Type of image to generate"),
+    .describe("Type of image to generate (auto-detected if not specified)"),
+  aspect_ratio: z
+    .enum(["16:9", "1:1", "4:3", "3:4", "9:16", "2:1"])
+    .optional()
+    .describe("Image aspect ratio (auto-selected based on type if not specified)"),
+  size: z
+    .enum(["1K", "2K", "4K"])
+    .default("2K")
+    .describe("Image resolution (1K, 2K, or 4K)"),
 });
 
 const RefineImageSchema = z.object({
@@ -91,16 +110,43 @@ function resolveOutputPath(output: string | undefined, prompt: string): string {
 // Register generate_image tool
 server.tool(
   "generate_image",
-  "Generate a diagram, chart, or visualization using Gemini",
+  "Generate a diagram, chart, or visualization using Gemini. Intelligently detects type from prompt and asks clarifying questions when uncertain. Supports: chart, comparison, flow, architecture, timeline, hierarchy, matrix, hero, visualization.",
   GenerateImageSchema.shape,
-  async ({ prompt, output, type }) => {
+  async ({ prompt, output, type, aspect_ratio, size }) => {
     try {
+      // Smart analysis of prompt
+      const analysis = analyzePrompt(prompt, {
+        type: type === "auto" ? undefined : type,
+        aspectRatio: aspect_ratio,
+        size,
+      });
+
+      // If low confidence and no explicit type, ask for clarification
+      if (!analysis.shouldProceed && analysis.clarifyingQuestion) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: analysis.clarifyingQuestion,
+            },
+          ],
+        };
+      }
+
       const client = getClient();
       const outputPath = resolveOutputPath(output, prompt);
-      const resolvedType = type === "auto" ? detectType(prompt) : type;
 
-      // Generate the image
-      const result = await client.generate(prompt, outputPath, type);
+      // Use recommended values from analysis
+      const finalType = analysis.recommendedType;
+      const finalAspectRatio = analysis.recommendedAspectRatio;
+      const finalSize = analysis.recommendedSize;
+
+      // Generate the image with smart-selected options
+      const result = await client.generate(prompt, outputPath, {
+        type: finalType,
+        aspectRatio: finalAspectRatio,
+        size: finalSize,
+      });
 
       if (!result.success) {
         return {
@@ -118,14 +164,23 @@ server.tool(
       saveSession({
         lastPrompt: prompt,
         lastOutput: result.outputPath!,
-        lastType: resolvedType,
+        lastType: finalType,
+        aspectRatio: result.aspectRatio,
+        size: finalSize,
       });
+
+      // Build response with suggestions if applicable
+      let responseText = `Generated ${finalType} (${result.aspectRatio}, ${finalSize}): ${result.outputPath}`;
+
+      if (analysis.suggestions && analysis.suggestions.length > 0) {
+        responseText += `\n\nNote: ${analysis.suggestions.join(". ")}. Use 'type' parameter to override.`;
+      }
 
       return {
         content: [
           {
             type: "text" as const,
-            text: `Generated ${resolvedType}: ${result.outputPath}`,
+            text: responseText,
           },
         ],
       };
@@ -180,7 +235,11 @@ server.tool(
         session.lastPrompt,
         refinement,
         refinedPath,
-        session.lastType
+        {
+          type: session.lastType,
+          aspectRatio: session.aspectRatio,
+          size: session.size,
+        }
       );
 
       if (!result.success) {

@@ -1,2 +1,14 @@
-export { GeminiImageClient, detectType, enhancePrompt } from "./client.js";
-export type { ImageConfig, GenerationResult } from "./client.js";
+export {
+  GeminiImageClient,
+  detectType,
+  detectTypeWithConfidence,
+  analyzePrompt,
+  buildPromptFromContext,
+  DIAGRAM_TYPES
+} from "./client.js";
+export type {
+  GenerationResult,
+  GenerateOptions,
+  TypeDetection,
+  PromptAnalysis
+} from "./client.js";

@@ -12,7 +12,9 @@ import * as os from "node:os";
 export interface Session {
   lastPrompt: string;
   lastOutput: string;
-  lastType: "diagram" | "chart" | "visualization" | "auto";
+  lastType: string; // Diagram type (chart, comparison, flow, architecture, etc.)
+  aspectRatio?: string; // Aspect ratio used
+  size?: string; // Resolution (1K, 2K, 4K)
   timestamp: number;
 }
 

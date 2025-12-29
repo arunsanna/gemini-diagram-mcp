@@ -1,14 +1,15 @@
 # mcp-gemini-image
 
-MCP server for generating diagrams, charts, and visualizations using Google Gemini's image generation capabilities.
+MCP server for generating diagrams, charts, and visualizations using Google Gemini's native image generation.
 
 ## Features
 
-- **Universal**: Works with Claude Code, Claude Desktop, Cursor, Windsurf, and any MCP-compatible client
-- **Simple API**: Natural language prompts → generated images
-- **Smart Defaults**: Auto-detect diagram type, generate meaningful filenames
-- **Iterative Refinement**: Modify last generated image without repeating the full prompt
-- **Session Persistence**: State preserved across MCP calls (1 hour expiry)
+- **Smart Detection**: Auto-detects diagram type from prompt, asks clarifying questions when uncertain
+- **Universal**: Works with Claude Code, Claude Desktop, Cursor, Windsurf, Cline, and any MCP client
+- **Professional Styling**: Consistent SaaS aesthetic with proper typography and color palette
+- **Configurable**: Aspect ratios (16:9, 1:1, 4:3, etc.) and resolutions (1K, 2K, 4K)
+- **Robust**: Retry logic with exponential backoff, PNG validation
+- **Iterative**: Refine last generated image without repeating full prompt
 
 ## Tools
 
@@ -17,106 +18,171 @@ MCP server for generating diagrams, charts, and visualizations using Google Gemi
 | `generate_image` | Generate diagram/chart/visualization from natural language |
 | `refine_image` | Iteratively refine the last generated image |
 
-### Supported Types (Auto-detected)
+### Parameters
 
-- **Diagrams**: Architecture, flow, sequence, ER, class, component, system, UML
-- **Charts**: Comparison, metrics, bar, pie, line, statistics, data, trend
-- **Visualizations**: Process flows, workflows, pipelines, timelines, roadmaps
+**generate_image**
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `prompt` | string | required | Natural language description |
+| `output` | string | auto | Output filename |
+| `type` | enum | auto | `chart`, `comparison`, `flow`, `architecture`, `timeline`, `hierarchy`, `matrix`, `hero`, `visualization` |
+| `aspect_ratio` | enum | auto | `16:9`, `1:1`, `4:3`, `3:4`, `9:16`, `2:1` |
+| `size` | enum | 2K | `1K`, `2K`, `4K` |
+
+**refine_image**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `refinement` | string | Description of changes to make |
 
 ## Installation
 
-```bash
-# From npm (once published)
-npm install -g mcp-gemini-image
+### 1. Clone and Build
 
-# From source
+```bash
 git clone https://github.com/arunsanna/mcp-gemini-image
 cd mcp-gemini-image
 npm install && npm run build
 ```
 
-## Configuration
+### 2. Get API Key
 
-### Environment Variables
+Get a Gemini API key from [Google AI Studio](https://makersuite.google.com/app/apikey)
+
+### 3. Configure Your Client
+
+#### Claude Code
 
 ```bash
-# Either of these works
-GEMINI_API_KEY=your-api-key
-GOOGLE_API_KEY=your-api-key
+# Quick setup
+claude mcp add-json gemini-image '{
+  "command": "node",
+  "args": ["/path/to/mcp-gemini-image/dist/index.js"],
+  "env": { "GOOGLE_API_KEY": "your-api-key" }
+}'
 ```
 
-### Claude Code (~/.claude.json)
+Or manually edit `~/.claude.json`:
+```json
+{
+  "mcpServers": {
+    "gemini-image": {
+      "command": "node",
+      "args": ["/absolute/path/to/mcp-gemini-image/dist/index.js"],
+      "env": {
+        "GOOGLE_API_KEY": "your-api-key"
+      }
+    }
+  }
+}
+```
+
+#### Cursor
+
+Add to Cursor settings (`Preferences > MCP Servers`):
+```json
+{
+  "gemini-image": {
+    "command": "node",
+    "args": ["/absolute/path/to/mcp-gemini-image/dist/index.js"],
+    "env": {
+      "GOOGLE_API_KEY": "your-api-key"
+    }
+  }
+}
+```
+
+#### Windsurf
+
+Add to `~/.windsurf/mcp.json`:
+```json
+{
+  "mcpServers": {
+    "gemini-image": {
+      "command": "node",
+      "args": ["/absolute/path/to/mcp-gemini-image/dist/index.js"],
+      "env": {
+        "GOOGLE_API_KEY": "your-api-key"
+      }
+    }
+  }
+}
+```
+
+#### Claude Desktop
+
+Add to `claude_desktop_config.json`:
+- macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- Windows: `%APPDATA%\Claude\claude_desktop_config.json`
 
 ```json
 {
   "mcpServers": {
     "gemini-image": {
       "command": "node",
-      "args": ["/path/to/mcp-gemini-image/dist/index.js"],
+      "args": ["/absolute/path/to/mcp-gemini-image/dist/index.js"],
       "env": {
-        "GEMINI_API_KEY": "your-api-key"
+        "GOOGLE_API_KEY": "your-api-key"
       }
     }
   }
 }
 ```
 
-### Claude Desktop (claude_desktop_config.json)
+#### Cline (VS Code)
 
+Add to Cline MCP settings in VS Code:
 ```json
 {
-  "mcpServers": {
-    "gemini-image": {
-      "command": "npx",
-      "args": ["mcp-gemini-image"],
-      "env": {
-        "GEMINI_API_KEY": "your-api-key"
-      }
+  "gemini-image": {
+    "command": "node",
+    "args": ["/absolute/path/to/mcp-gemini-image/dist/index.js"],
+    "env": {
+      "GOOGLE_API_KEY": "your-api-key"
     }
   }
 }
 ```
+
+### 4. Restart Your Client
+
+Restart the application to load the MCP server.
 
 ## Usage Examples
 
-Once configured, the AI can use these tools:
-
 ```
-User: "Generate an architecture diagram showing React → API → Postgres"
-AI: [calls generate_image with prompt] → react_api_postgres.png
+User: "Create an architecture diagram showing React → API Gateway → Lambda → DynamoDB"
+AI: → Generated architecture (4:3, 2K): ./react_api_gateway.png
 
-User: "Make the database icon larger"
-AI: [calls refine_image] → react_api_postgres_refined.png
+User: "Make the arrows thicker"
+AI: → Refined image: ./react_api_gateway_refined.png
 
-User: "Create a comparison chart of latency: before 450ms, after 120ms"
-AI: [calls generate_image] → latency_comparison.png
+User: "Compare latency: 450ms before vs 120ms after optimization"
+AI: → Generated comparison (16:9, 2K): ./latency_comparison.png
+
+User: "Create a nice visual for my presentation"
+AI: "I'm not certain about the best visualization type. What type would you prefer?
+     - chart: Data visualization with clear labels
+     - comparison: Side-by-side panels
+     - flow: Sequential stages with arrows
+     - architecture: System components with connections
+     ..."
 ```
 
-### Tool Parameters
+### Smart Detection
 
-**generate_image**
-- `prompt` (required): Natural language description
-- `output` (optional): Output filename (auto-generated if not provided)
-- `type` (optional): `diagram` | `chart` | `visualization` | `auto` (default: auto)
+The server auto-detects optimal settings from your prompt:
 
-**refine_image**
-- `refinement` (required): Description of changes to make
-
-## Development
-
-```bash
-# Install dependencies
-npm install
-
-# Build
-npm run build
-
-# Watch mode
-npm run dev
-
-# Test locally (requires GEMINI_API_KEY)
-node dist/index.js
-```
+| Keyword | Detected Type | Aspect Ratio |
+|---------|---------------|--------------|
+| "compare", "vs", "before/after" | comparison | 16:9 |
+| "flow", "process", "pipeline" | flow | 16:9 |
+| "architecture", "system", "layers" | architecture | 4:3 |
+| "timeline", "roadmap", "phases" | timeline | 16:9 |
+| "hierarchy", "org chart", "tree" | hierarchy | 4:3 |
+| "matrix", "grid", "quadrant" | matrix | 1:1 |
+| "presentation", "slide" | (any) | 4K |
+| "square" | (any) | 1:1 |
+| "wide", "banner" | (any) | 2:1 |
 
 ## Architecture
 
@@ -125,22 +191,28 @@ src/
 ├── index.ts              # MCP server entry point
 ├── gemini/
 │   ├── index.ts          # Module exports
-│   └── client.ts         # Gemini API wrapper
+│   └── client.ts         # Gemini API client with smart detection
 └── utils/
-    ├── index.ts          # Module exports
-    └── session.ts        # Session persistence
+    └── session.ts        # Session persistence for refinement
 ```
 
 ### How It Works
 
-1. **Prompt Enhancement**: Raw prompts are wrapped with professional styling instructions based on detected type
-2. **Image Generation**: Uses Gemini's `imagen-3.0-generate-002` model via `@google/genai` SDK
-3. **Session Tracking**: Last generation stored in `~/.mcp-gemini-image/session.json` for refinement
-4. **Smart Filenames**: Auto-generated from prompt keywords (e.g., "auth flow diagram" → `auth_flow_diagram.png`)
+1. **Smart Analysis**: `analyzePrompt()` scores prompt against type keywords, returns confidence level
+2. **Clarifying Questions**: Low confidence → returns question instead of generating
+3. **Prompt Enhancement**: Wraps prompt with professional styling instructions
+4. **Image Generation**: Uses `gemini-3-pro-image-preview` via `@google/genai` SDK
+5. **Retry Logic**: 3 attempts with exponential backoff (1s → 2s → 4s)
+6. **PNG Validation**: Verifies magic bytes before saving
+7. **Session Tracking**: Stores last generation in `~/.mcp-gemini-image/session.json`
 
-## Prior Art
+## Development
 
-This provides MCP server functionality inspired by `~/bin/gemini-image-gen` for broader tool compatibility.
+```bash
+npm install      # Install dependencies
+npm run build    # Build TypeScript
+npm run dev      # Watch mode
+```
 
 ## License
 

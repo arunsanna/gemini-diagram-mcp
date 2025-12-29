@@ -106,7 +106,7 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 MCP servers are stateless between calls. For refinement support:
 
 1. **In-memory state** - Works for single session
-2. **File-based state** - Persist to `~/.mcp-gemini-image/session.json`
+2. **File-based state** - Persist to `~/.gemini-diagram-mcp/session.json`
 
 ```typescript
 interface Session {
@@ -123,7 +123,7 @@ interface Session {
 - [x] Native TypeScript with `@google/genai` SDK
 - [x] `generate_image` tool with type auto-detection
 - [x] `refine_image` tool with session state
-- [x] Session persistence in `~/.mcp-gemini-image/`
+- [x] Session persistence in `~/.gemini-diagram-mcp/`
 - [x] Professional prompt enhancement for each type
 - [ ] Test with Claude Code
 - [ ] Publish to npm

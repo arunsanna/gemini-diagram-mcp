@@ -19,7 +19,7 @@ export interface Session {
 }
 
 // Session file location
-const SESSION_DIR = path.join(os.homedir(), ".mcp-gemini-image");
+const SESSION_DIR = path.join(os.homedir(), ".gemini-diagram-mcp");
 const SESSION_FILE = path.join(SESSION_DIR, "session.json");
 
 // Session expiry (1 hour)

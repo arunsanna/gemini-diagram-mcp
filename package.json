@@ -1,6 +1,6 @@
 {
   "name": "gemini-diagram-mcp",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "MCP server for generating diagrams, charts, and visualizations using Google Gemini",
   "type": "module",
   "main": "dist/index.js",
@@ -31,11 +31,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/arunsanna/mcp-gemini-image.git"
+    "url": "git+https://github.com/arunsanna/gemini-diagram-mcp.git"
   },
-  "homepage": "https://github.com/arunsanna/mcp-gemini-image#readme",
+  "homepage": "https://github.com/arunsanna/gemini-diagram-mcp#readme",
   "bugs": {
-    "url": "https://github.com/arunsanna/mcp-gemini-image/issues"
+    "url": "https://github.com/arunsanna/gemini-diagram-mcp/issues"
   },
   "dependencies": {
     "@google/genai": "^1.0.0",

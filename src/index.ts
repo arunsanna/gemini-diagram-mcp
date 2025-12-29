@@ -9,11 +9,32 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
+import * as path from "node:path";
+
+import { GeminiImageClient, detectType } from "./gemini/client.js";
+import { loadSession, saveSession, clearSession } from "./utils/session.js";
+
+// Validate environment on startup
+function validateEnvironment(): void {
+  const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+  if (!apiKey) {
+    console.error(
+      "Error: GEMINI_API_KEY or GOOGLE_API_KEY environment variable required"
+    );
+    console.error("Set it in your shell or Claude Code MCP configuration");
+    process.exit(1);
+  }
+}
 
 // Tool schemas
 const GenerateImageSchema = z.object({
-  prompt: z.string().describe("Natural language description of the image to generate"),
-  output: z.string().optional().describe("Output filename (auto-generated if not provided)"),
+  prompt: z
+    .string()
+    .describe("Natural language description of the image to generate"),
+  output: z
+    .string()
+    .optional()
+    .describe("Output filename (auto-generated if not provided)"),
   type: z
     .enum(["diagram", "chart", "visualization", "auto"])
     .default("auto")
@@ -21,7 +42,9 @@ const GenerateImageSchema = z.object({
 });
 
 const RefineImageSchema = z.object({
-  refinement: z.string().describe("Description of changes to make to the last image"),
+  refinement: z
+    .string()
+    .describe("Description of changes to make to the last image"),
 });
 
 // Create MCP server
@@ -30,68 +53,15 @@ const server = new McpServer({
   version: "0.1.0",
 });
 
-// State for refinement
-let lastGeneratedImage: string | null = null;
-let lastPrompt: string | null = null;
+// Initialize Gemini client (lazy - created on first use)
+let geminiClient: GeminiImageClient | null = null;
 
-// Register tools
-server.tool(
-  "generate_image",
-  "Generate a diagram, chart, or visualization using Gemini",
-  GenerateImageSchema.shape,
-  async ({ prompt, output, type }) => {
-    // TODO: Implement Gemini image generation
-    // 1. Detect type if auto
-    // 2. Generate image via Gemini API
-    // 3. Save to output path
-    // 4. Update state for refinement
-
-    const filename = output ?? generateFilename(prompt);
-
-    // Placeholder response
-    return {
-      content: [
-        {
-          type: "text" as const,
-          text: `[TODO] Would generate ${type} image from: "${prompt}" → ${filename}`,
-        },
-      ],
-    };
+function getClient(): GeminiImageClient {
+  if (!geminiClient) {
+    geminiClient = new GeminiImageClient();
   }
-);
-
-server.tool(
-  "refine_image",
-  "Refine the last generated image with modifications",
-  RefineImageSchema.shape,
-  async ({ refinement }) => {
-    if (!lastGeneratedImage || !lastPrompt) {
-      return {
-        content: [
-          {
-            type: "text" as const,
-            text: "No previous image to refine. Use generate_image first.",
-          },
-        ],
-        isError: true,
-      };
-    }
-
-    // TODO: Implement refinement
-    // 1. Combine original prompt with refinement
-    // 2. Regenerate image
-    // 3. Update state
-
-    return {
-      content: [
-        {
-          type: "text" as const,
-          text: `[TODO] Would refine "${lastGeneratedImage}" with: "${refinement}"`,
-        },
-      ],
-    };
-  }
-);
+  return geminiClient;
+}
 
 // Helper: Generate smart filename from prompt
 function generateFilename(prompt: string): string {
@@ -105,8 +75,160 @@ function generateFilename(prompt: string): string {
   return `${words.join("_") || "image"}.png`;
 }
 
+// Helper: Resolve output path
+function resolveOutputPath(output: string | undefined, prompt: string): string {
+  const filename = output ?? generateFilename(prompt);
+
+  // If absolute path, use as-is
+  if (path.isAbsolute(filename)) {
+    return filename;
+  }
+
+  // Otherwise, save to current working directory
+  return path.resolve(process.cwd(), filename);
+}
+
+// Register generate_image tool
+server.tool(
+  "generate_image",
+  "Generate a diagram, chart, or visualization using Gemini",
+  GenerateImageSchema.shape,
+  async ({ prompt, output, type }) => {
+    try {
+      const client = getClient();
+      const outputPath = resolveOutputPath(output, prompt);
+      const resolvedType = type === "auto" ? detectType(prompt) : type;
+
+      // Generate the image
+      const result = await client.generate(prompt, outputPath, type);
+
+      if (!result.success) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Failed to generate image: ${result.error}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      // Save session for potential refinement
+      saveSession({
+        lastPrompt: prompt,
+        lastOutput: result.outputPath!,
+        lastType: resolvedType,
+      });
+
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: `Generated ${resolvedType}: ${result.outputPath}`,
+          },
+        ],
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: `Error: ${message}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+);
+
+// Register refine_image tool
+server.tool(
+  "refine_image",
+  "Refine the last generated image with modifications",
+  RefineImageSchema.shape,
+  async ({ refinement }) => {
+    try {
+      // Load previous session
+      const session = loadSession();
+
+      if (!session) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: "No previous image to refine. Use generate_image first.",
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      const client = getClient();
+
+      // Generate refined version with new filename
+      const baseName = path.basename(
+        session.lastOutput,
+        path.extname(session.lastOutput)
+      );
+      const dir = path.dirname(session.lastOutput);
+      const refinedPath = path.join(dir, `${baseName}_refined.png`);
+
+      const result = await client.refine(
+        session.lastPrompt,
+        refinement,
+        refinedPath,
+        session.lastType
+      );
+
+      if (!result.success) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Failed to refine image: ${result.error}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      // Update session with refined image
+      saveSession({
+        lastPrompt: `${session.lastPrompt}\n\nRefinement: ${refinement}`,
+        lastOutput: result.outputPath!,
+        lastType: session.lastType,
+      });
+
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: `Refined image: ${result.outputPath}`,
+          },
+        ],
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: `Error: ${message}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+);
+
 // Start server
 async function main() {
+  validateEnvironment();
+
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error("Gemini Image MCP server running on stdio");

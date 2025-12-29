@@ -116,11 +116,14 @@ interface Session {
 }
 ```
 
-## Next Steps
+## Implementation Status
 
-1. [ ] Decide on Option A vs B
-2. [ ] Extract presets from Python script
-3. [ ] Implement generate_image with subprocess wrapper
-4. [ ] Add session persistence
-5. [ ] Test with Claude Code
-6. [ ] Publish to npm
+**Approach**: Option B (Native TypeScript) was chosen for cleaner architecture.
+
+- [x] Native TypeScript with `@google/genai` SDK
+- [x] `generate_image` tool with type auto-detection
+- [x] `refine_image` tool with session state
+- [x] Session persistence in `~/.mcp-gemini-image/`
+- [x] Professional prompt enhancement for each type
+- [ ] Test with Claude Code
+- [ ] Publish to npm

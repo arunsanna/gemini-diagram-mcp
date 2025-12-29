@@ -1,4 +1,4 @@
-# mcp-gemini-image
+# gemini-diagram-mcp
 
 MCP server for generating diagrams, charts, and visualizations using Google Gemini's native image generation.
 
@@ -47,7 +47,7 @@ No build required - just use `npx`:
 #### Claude Code
 
 ```bash
-claude mcp add-json gemini-image '{"command":"npx","args":["mcp-gemini-image"],"env":{"GOOGLE_API_KEY":"your-api-key"}}'
+claude mcp add-json gemini-image '{"command":"npx","args":["gemini-diagram-mcp"],"env":{"GOOGLE_API_KEY":"your-api-key"}}'
 ```
 
 Or manually edit `~/.claude.json`:
@@ -56,7 +56,7 @@ Or manually edit `~/.claude.json`:
   "mcpServers": {
     "gemini-image": {
       "command": "npx",
-      "args": ["mcp-gemini-image"],
+      "args": ["gemini-diagram-mcp"],
       "env": {
         "GOOGLE_API_KEY": "your-api-key"
       }
@@ -72,7 +72,7 @@ Add to Cursor settings (`Preferences > MCP Servers`):
 {
   "gemini-image": {
     "command": "npx",
-    "args": ["mcp-gemini-image"],
+    "args": ["gemini-diagram-mcp"],
     "env": {
       "GOOGLE_API_KEY": "your-api-key"
     }
@@ -88,7 +88,7 @@ Add to `~/.windsurf/mcp.json`:
   "mcpServers": {
     "gemini-image": {
       "command": "npx",
-      "args": ["mcp-gemini-image"],
+      "args": ["gemini-diagram-mcp"],
       "env": {
         "GOOGLE_API_KEY": "your-api-key"
       }
@@ -108,7 +108,7 @@ Add to `claude_desktop_config.json`:
   "mcpServers": {
     "gemini-image": {
       "command": "npx",
-      "args": ["mcp-gemini-image"],
+      "args": ["gemini-diagram-mcp"],
       "env": {
         "GOOGLE_API_KEY": "your-api-key"
       }
@@ -124,7 +124,7 @@ Add to Cline MCP settings in VS Code:
 {
   "gemini-image": {
     "command": "npx",
-    "args": ["mcp-gemini-image"],
+    "args": ["gemini-diagram-mcp"],
     "env": {
       "GOOGLE_API_KEY": "your-api-key"
     }
@@ -139,10 +139,10 @@ Restart the application to load the MCP server.
 ### Alternative: Global Install
 
 ```bash
-npm install -g mcp-gemini-image
+npm install -g gemini-diagram-mcp
 ```
 
-Then use `"command": "mcp-gemini-image"` instead of npx.
+Then use `"command": "gemini-diagram-mcp"` instead of npx.
 
 ## Usage Examples
 
@@ -201,7 +201,7 @@ src/
 4. **Image Generation**: Uses `gemini-3-pro-image-preview` via `@google/genai` SDK
 5. **Retry Logic**: 3 attempts with exponential backoff (1s → 2s → 4s)
 6. **PNG Validation**: Verifies magic bytes before saving
-7. **Session Tracking**: Stores last generation in `~/.mcp-gemini-image/session.json`
+7. **Session Tracking**: Stores last generation in `~/.gemini-diagram-mcp/session.json`
 
 ## Development
 

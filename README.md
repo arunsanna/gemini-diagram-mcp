@@ -147,27 +147,6 @@ npm install -g gemini-diagram-mcp
 
 Then use `"command": "gemini-diagram-mcp"` instead of npx.
 
-### Alternative: From Source
-
-```bash
-git clone https://github.com/arunsanna/gemini-diagram-mcp.git
-cd gemini-diagram-mcp
-npm install && npm run build
-```
-
-Then use:
-```json
-{
-  "gemini-image": {
-    "command": "node",
-    "args": ["/path/to/gemini-diagram-mcp/dist/index.js"],
-    "env": {
-      "GOOGLE_API_KEY": "your-api-key"
-    }
-  }
-}
-```
-
 ## Usage Examples
 
 ```
@@ -229,12 +208,13 @@ src/
 
 ## Development
 
+For contributors who want to modify the code:
+
 ```bash
 git clone https://github.com/arunsanna/gemini-diagram-mcp.git
 cd gemini-diagram-mcp
-npm install      # Install dependencies
-npm run build    # Build TypeScript
-npm run dev      # Watch mode
+npm install && npm run build
+npm run dev      # Watch mode for development
 ```
 
 ## Contributing

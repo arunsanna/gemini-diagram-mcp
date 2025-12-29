@@ -1,6 +1,6 @@
 {
   "name": "gemini-diagram-mcp",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "MCP server for generating diagrams, charts, and visualizations using Google Gemini",
   "type": "module",
   "main": "dist/index.js",

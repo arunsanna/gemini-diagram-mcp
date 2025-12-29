@@ -139,14 +139,6 @@ Add to Cline MCP settings in VS Code:
 
 Restart the application to load the MCP server.
 
-### Alternative: Global Install
-
-```bash
-npm install -g gemini-diagram-mcp
-```
-
-Then use `"command": "gemini-diagram-mcp"` instead of npx.
-
 ## Usage Examples
 
 ```
@@ -205,17 +197,6 @@ src/
 5. **Retry Logic**: 3 attempts with exponential backoff (1s → 2s → 4s)
 6. **PNG Validation**: Verifies magic bytes before saving
 7. **Session Tracking**: Stores last generation in `~/.gemini-diagram-mcp/session.json`
-
-## Development
-
-For contributors who want to modify the code:
-
-```bash
-git clone https://github.com/arunsanna/gemini-diagram-mcp.git
-cd gemini-diagram-mcp
-npm install && npm run build
-npm run dev      # Watch mode for development
-```
 
 ## Contributing
 

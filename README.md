@@ -36,29 +36,18 @@ MCP server for generating diagrams, charts, and visualizations using Google Gemi
 
 ## Installation
 
-### 1. Clone and Build
+### 1. Get API Key
 
-```bash
-git clone https://github.com/arunsanna/mcp-gemini-image
-cd mcp-gemini-image
-npm install && npm run build
-```
+Get a Gemini API key from [Google AI Studio](https://aistudio.google.com/apikey)
 
-### 2. Get API Key
+### 2. Configure Your Client
 
-Get a Gemini API key from [Google AI Studio](https://makersuite.google.com/app/apikey)
-
-### 3. Configure Your Client
+No build required - just use `npx`:
 
 #### Claude Code
 
 ```bash
-# Quick setup
-claude mcp add-json gemini-image '{
-  "command": "node",
-  "args": ["/path/to/mcp-gemini-image/dist/index.js"],
-  "env": { "GOOGLE_API_KEY": "your-api-key" }
-}'
+claude mcp add-json gemini-image '{"command":"npx","args":["mcp-gemini-image"],"env":{"GOOGLE_API_KEY":"your-api-key"}}'
 ```
 
 Or manually edit `~/.claude.json`:
@@ -66,8 +55,8 @@ Or manually edit `~/.claude.json`:
 {
   "mcpServers": {
     "gemini-image": {
-      "command": "node",
-      "args": ["/absolute/path/to/mcp-gemini-image/dist/index.js"],
+      "command": "npx",
+      "args": ["mcp-gemini-image"],
       "env": {
         "GOOGLE_API_KEY": "your-api-key"
       }
@@ -82,8 +71,8 @@ Add to Cursor settings (`Preferences > MCP Servers`):
 ```json
 {
   "gemini-image": {
-    "command": "node",
-    "args": ["/absolute/path/to/mcp-gemini-image/dist/index.js"],
+    "command": "npx",
+    "args": ["mcp-gemini-image"],
     "env": {
       "GOOGLE_API_KEY": "your-api-key"
     }
@@ -98,8 +87,8 @@ Add to `~/.windsurf/mcp.json`:
 {
   "mcpServers": {
     "gemini-image": {
-      "command": "node",
-      "args": ["/absolute/path/to/mcp-gemini-image/dist/index.js"],
+      "command": "npx",
+      "args": ["mcp-gemini-image"],
       "env": {
         "GOOGLE_API_KEY": "your-api-key"
       }
@@ -118,8 +107,8 @@ Add to `claude_desktop_config.json`:
 {
   "mcpServers": {
     "gemini-image": {
-      "command": "node",
-      "args": ["/absolute/path/to/mcp-gemini-image/dist/index.js"],
+      "command": "npx",
+      "args": ["mcp-gemini-image"],
       "env": {
         "GOOGLE_API_KEY": "your-api-key"
       }
@@ -134,8 +123,8 @@ Add to Cline MCP settings in VS Code:
 ```json
 {
   "gemini-image": {
-    "command": "node",
-    "args": ["/absolute/path/to/mcp-gemini-image/dist/index.js"],
+    "command": "npx",
+    "args": ["mcp-gemini-image"],
     "env": {
       "GOOGLE_API_KEY": "your-api-key"
     }
@@ -143,9 +132,17 @@ Add to Cline MCP settings in VS Code:
 }
 ```
 
-### 4. Restart Your Client
+### 3. Restart Your Client
 
 Restart the application to load the MCP server.
+
+### Alternative: Global Install
+
+```bash
+npm install -g mcp-gemini-image
+```
+
+Then use `"command": "mcp-gemini-image"` instead of npx.
 
 ## Usage Examples
 

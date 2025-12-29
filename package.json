@@ -1,7 +1,7 @@
 {
   "name": "mcp-gemini-image",
-  "version": "0.1.0",
-  "description": "MCP server for generating diagrams and images using Google Gemini",
+  "version": "1.0.0",
+  "description": "MCP server for generating diagrams, charts, and visualizations using Google Gemini",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
@@ -11,20 +11,35 @@
     "build": "tsc",
     "dev": "tsc --watch",
     "start": "node dist/index.js",
-    "prepare": "npm run build"
+    "prepublishOnly": "npm run build"
   },
   "keywords": [
     "mcp",
+    "model-context-protocol",
     "gemini",
+    "google-ai",
     "image-generation",
     "diagrams",
-    "ai"
+    "charts",
+    "visualization",
+    "ai",
+    "claude",
+    "cursor",
+    "windsurf"
   ],
   "author": "Arun Sanna",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/arunsanna/mcp-gemini-image.git"
+  },
+  "homepage": "https://github.com/arunsanna/mcp-gemini-image#readme",
+  "bugs": {
+    "url": "https://github.com/arunsanna/mcp-gemini-image/issues"
+  },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.0",
     "@google/genai": "^1.0.0",
+    "@modelcontextprotocol/sdk": "^1.0.0",
     "zod": "^3.24.0"
   },
   "devDependencies": {
@@ -35,6 +50,8 @@
     "node": ">=18"
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md",
+    "LICENSE"
   ]
 }

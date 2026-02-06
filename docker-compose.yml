@@ -1,0 +1,26 @@
+services:
+  gemini-diagram-mcp:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      # Required (pick one)
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+
+      # Required for auth
+      - MCP_AUTH_TOKEN=${MCP_AUTH_TOKEN}
+
+      # Storage (bind-mounted below)
+      - OUTPUT_DIR=/data/out
+
+      # Used for generating download links in tool responses
+      - PUBLIC_BASE_URL=${PUBLIC_BASE_URL:-http://localhost:3000}
+
+      # Optional
+      - HOST=0.0.0.0
+      - PORT=3000
+      - INLINE_IMAGES=${INLINE_IMAGES:-0}
+    volumes:
+      - ./data:/data
+

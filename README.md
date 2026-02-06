@@ -43,7 +43,117 @@ MCP server for generating diagrams, charts, and visualizations using Google Gemi
 
 Get a Gemini API key from [Google AI Studio](https://aistudio.google.com/apikey)
 
-### 2. Configure Your Client
+### 2. Choose How You Run It
+
+You can run this MCP in two ways:
+
+1. **Local stdio server (classic MCP)**: each client spawns `npx gemini-diagram-mcp` and you provide the Gemini API key to the client.
+2. **Centralized HTTP server (recommended for teams)**: run one Docker container with the API key + auth token, and have clients connect via a local proxy (no API key on clients).
+
+## Centralized Deployment (Docker)
+
+This runs one MCP server that all agents share.
+
+### Requirements
+
+- `GOOGLE_API_KEY` or `GEMINI_API_KEY`
+- `MCP_AUTH_TOKEN` (required)
+
+### Suggested `.env`
+
+```bash
+GOOGLE_API_KEY=your-api-key
+MCP_AUTH_TOKEN=your-strong-token
+# PUBLIC_BASE_URL=http://<server-ip>:3000
+```
+
+### Run
+
+```bash
+export GOOGLE_API_KEY="your-api-key"
+export MCP_AUTH_TOKEN="your-strong-token"
+docker compose up --build
+```
+
+Outputs are written to `./data/out` on the host (via bind mount).
+
+The MCP endpoint will be:
+
+- Streamable HTTP: `http://localhost:3000/mcp`
+- Legacy SSE: `http://localhost:3000/sse`
+
+All endpoints require auth via:
+
+- `Authorization: Bearer $MCP_AUTH_TOKEN` (recommended), or
+- `?token=$MCP_AUTH_TOKEN` (useful for clients that can't set headers)
+
+## Client Setup (Local Proxy)
+
+For MCP clients that expect `command`/`args` (Claude Code, Claude Desktop, VS Code integrations, etc.), run the included stdio proxy so the client talks stdio but execution happens on the central server.
+
+Set environment:
+
+- `MCP_REMOTE_URL` (default: `http://localhost:3000/mcp`)
+- `MCP_AUTH_TOKEN` (required)
+
+Example (Claude Code):
+
+```bash
+claude mcp add-json gemini-image '{
+  "command":"npx",
+  "args":["gemini-diagram-mcp","proxy"],
+  "env":{
+    "MCP_REMOTE_URL":"http://localhost:3000/mcp",
+    "MCP_AUTH_TOKEN":"your-strong-token"
+  }
+}'
+```
+
+Example (Claude Desktop):
+
+Add to `claude_desktop_config.json`:
+- macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- Windows: `%APPDATA%\\Claude\\claude_desktop_config.json`
+
+```json
+{
+  "mcpServers": {
+    "gemini-image": {
+      "command": "npx",
+      "args": ["gemini-diagram-mcp", "proxy"],
+      "env": {
+        "MCP_REMOTE_URL": "http://localhost:3000/mcp",
+        "MCP_AUTH_TOKEN": "your-strong-token"
+      }
+    }
+  }
+}
+```
+
+Example (VS Code / Cline):
+
+```json
+{
+  "gemini-image": {
+    "command": "npx",
+    "args": ["gemini-diagram-mcp", "proxy"],
+    "env": {
+      "MCP_REMOTE_URL": "http://localhost:3000/mcp",
+      "MCP_AUTH_TOKEN": "your-strong-token"
+    }
+  }
+}
+```
+
+Other MCP clients (Codex CLI, opencode, etc.):
+
+If your client supports configuring an MCP server with `command` + `args` + `env`, use the same proxy config:
+
+- `command`: `npx`
+- `args`: `["gemini-diagram-mcp","proxy"]`
+- `env`: `MCP_REMOTE_URL`, `MCP_AUTH_TOKEN`
+
+## Local (Classic) Installation
 
 No build required - just use `npx`:
 
@@ -180,12 +290,14 @@ The server auto-detects optimal settings from your prompt:
 
 ```
 src/
-├── index.ts              # MCP server entry point
+├── index.ts              # CLI entry point (stdio/http/proxy)
+├── http.ts               # Centralized HTTP MCP server
+├── proxy.ts              # Stdio proxy that forwards to HTTP server
+├── stdio.ts              # Classic stdio MCP server
+├── mcp.ts                # Tool registration shared across modes
 ├── gemini/
 │   ├── index.ts          # Module exports
 │   └── client.ts         # Gemini API client with smart detection
-└── utils/
-    └── session.ts        # Session persistence for refinement
 ```
 
 ### How It Works
@@ -196,7 +308,7 @@ src/
 4. **Image Generation**: Uses `gemini-3-pro-image-preview` via `@google/genai` SDK
 5. **Retry Logic**: 3 attempts with exponential backoff (1s → 2s → 4s)
 6. **PNG Validation**: Verifies magic bytes before saving
-7. **Session Tracking**: Stores last generation in `~/.gemini-diagram-mcp/session.json`
+7. **Session Tracking**: In-memory per MCP connection/session (suitable for centralized servers)
 
 ## Contributing
 

@@ -71,6 +71,7 @@ export interface GenerationResult {
   error?: string;
   textResponse?: string;
   aspectRatio?: string;
+  imageData?: Buffer;
 }
 
 // ============================================================================
@@ -521,6 +522,7 @@ export class GeminiImageClient {
         outputPath: path.resolve(outputPath),
         textResponse: textResponse || undefined,
         aspectRatio: aspectRatio,
+        imageData,
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);

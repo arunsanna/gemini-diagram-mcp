@@ -103,18 +103,29 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 ## Session Persistence
 
-MCP servers are stateless between calls. For refinement support:
+Refinement (`refine_image`) requires the server to remember the last generated image within an MCP session/connection.
 
-1. **In-memory state** - Works for single session
-2. **File-based state** - Persist to `~/.gemini-diagram-mcp/session.json`
+This project uses **in-memory per MCP connection** state:
 
 ```typescript
 interface Session {
   lastPrompt: string;
-  lastOutput: string;
-  lastTimestamp: number;
+  lastOutputPath: string;
+  lastType: string;
+  aspectRatio?: string;
+  size?: string;
 }
 ```
+
+This is safe for centralized hosting (multi-tenant), but does not survive process restarts.
+
+## Deployment Modes
+
+The CLI supports three modes:
+
+1. `gemini-diagram-mcp` (default): classic **stdio** MCP server
+2. `gemini-diagram-mcp http`: centralized **HTTP** MCP server (Streamable HTTP `/mcp` plus optional legacy SSE)
+3. `gemini-diagram-mcp proxy`: **stdio proxy** that forwards MCP tool calls to a centralized HTTP server
 
 ## Implementation Status
 
@@ -123,7 +134,9 @@ interface Session {
 - [x] Native TypeScript with `@google/genai` SDK
 - [x] `generate_image` tool with type auto-detection
 - [x] `refine_image` tool with session state
-- [x] Session persistence in `~/.gemini-diagram-mcp/`
+- [x] Centralized HTTP server mode (Streamable HTTP + legacy SSE)
+- [x] Required auth token for centralized mode (`MCP_AUTH_TOKEN`)
+- [x] Stdio proxy mode (no API key on clients)
 - [x] Professional prompt enhancement for each type
 - [ ] Test with Claude Code
 - [ ] Publish to npm

@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gemini-diagram-mcp
+spec:
+  template:
+    spec:
+      containers:
+        - name: gemini-diagram-mcp
+          # Update to your pushed image tag.
+          image: ghcr.io/arunsanna/gemini-diagram-mcp:latest
+          env:
+            - name: MCP_AUTH_MODE
+              value: oidc
+            - name: OIDC_ISSUER
+              value: https://issuer.example.com/realms/your-realm
+            - name: OIDC_AUDIENCE
+              value: your-audience
+            # For security, keep query token disabled for OIDC unless you have a strong reason.
+            - name: MCP_ALLOW_QUERY_TOKEN
+              value: "0"
+            # Set this to your public Ingress URL so tool responses include correct download links.
+            - name: PUBLIC_BASE_URL
+              value: https://gemini-mcp.example.com
+
+            # Remove static-token auth env vars from the base deployment.
+            - name: MCP_AUTH_TOKEN
+              $patch: delete
+

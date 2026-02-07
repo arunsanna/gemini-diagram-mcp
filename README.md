@@ -48,7 +48,7 @@ Get a Gemini API key from [Google AI Studio](https://aistudio.google.com/apikey)
 You can run this MCP in two ways:
 
 1. **Local stdio server (classic MCP)**: each client spawns `npx gemini-diagram-mcp` and you provide the Gemini API key to the client.
-2. **Centralized HTTP server (recommended for teams)**: run one Docker container with the API key + auth token, and have clients connect via a local proxy (no API key on clients).
+2. **Centralized HTTP server (recommended for teams)**: run one Docker container with the API key + auth (static token or OIDC), and have clients connect via a local proxy (no API key on clients).
 
 ## Centralized Deployment (Docker)
 
@@ -57,20 +57,33 @@ This runs one MCP server that all agents share.
 ### Requirements
 
 - `GOOGLE_API_KEY` or `GEMINI_API_KEY`
-- `MCP_AUTH_TOKEN` (required)
+- Auth (choose one):
+  - **Static token** (default): `MCP_AUTH_MODE=token` + `MCP_AUTH_TOKEN` (or `MCP_AUTH_TOKENS`)
+  - **OIDC JWT** (recommended for multi-user): `MCP_AUTH_MODE=oidc` + `OIDC_ISSUER` (+ `OIDC_AUDIENCE` recommended)
+  - **No auth** (not recommended): `MCP_AUTH_MODE=none` (only safe behind a trusted auth proxy / private network)
 
 ### Suggested `.env`
 
 ```bash
 GOOGLE_API_KEY=your-api-key
-MCP_AUTH_TOKEN=your-strong-token
 # PUBLIC_BASE_URL=http://<server-ip>:3000
+
+# Auth (choose one)
+MCP_AUTH_MODE=token
+MCP_AUTH_TOKEN=your-strong-token
+
+# Or: OIDC JWT auth (per-user tokens)
+# MCP_AUTH_MODE=oidc
+# OIDC_ISSUER=https://issuer.example.com/realms/your-realm
+# OIDC_AUDIENCE=your-audience
+# OIDC_JWKS_URI=https://issuer.example.com/.../jwks.json
 ```
 
 ### Run
 
 ```bash
 export GOOGLE_API_KEY="your-api-key"
+export MCP_AUTH_MODE="token"
 export MCP_AUTH_TOKEN="your-strong-token"
 docker compose up --build
 ```
@@ -82,10 +95,15 @@ The MCP endpoint will be:
 - Streamable HTTP: `http://localhost:3000/mcp`
 - Legacy SSE: `http://localhost:3000/sse`
 
-All endpoints require auth via:
+All endpoints require auth. Depending on your auth mode:
 
+**Static token mode** (`MCP_AUTH_MODE=token`):
 - `Authorization: Bearer $MCP_AUTH_TOKEN` (recommended), or
 - `?token=$MCP_AUTH_TOKEN` (useful for clients that can't set headers)
+
+**OIDC JWT mode** (`MCP_AUTH_MODE=oidc`):
+- `Authorization: Bearer <OIDC access token>`
+- `?token=...` is disabled by default in oidc mode; set `MCP_ALLOW_QUERY_TOKEN=1` to allow it (not recommended)
 
 ## Client Setup (Local Proxy)
 
@@ -94,7 +112,7 @@ For MCP clients that expect `command`/`args` (Claude Code, Claude Desktop, VS Co
 Set environment:
 
 - `MCP_REMOTE_URL` (default: `http://localhost:3000/mcp`)
-- `MCP_AUTH_TOKEN` (required)
+- `MCP_BEARER_TOKEN` (required; OIDC access token or static token)
 
 Example (Claude Code):
 
@@ -104,7 +122,7 @@ claude mcp add-json gemini-image '{
   "args":["gemini-diagram-mcp","proxy"],
   "env":{
     "MCP_REMOTE_URL":"http://localhost:3000/mcp",
-    "MCP_AUTH_TOKEN":"your-strong-token"
+    "MCP_BEARER_TOKEN":"your-bearer-token"
   }
 }'
 ```
@@ -123,7 +141,7 @@ Add to `claude_desktop_config.json`:
       "args": ["gemini-diagram-mcp", "proxy"],
       "env": {
         "MCP_REMOTE_URL": "http://localhost:3000/mcp",
-        "MCP_AUTH_TOKEN": "your-strong-token"
+        "MCP_BEARER_TOKEN": "your-bearer-token"
       }
     }
   }
@@ -139,7 +157,7 @@ Example (VS Code / Cline):
     "args": ["gemini-diagram-mcp", "proxy"],
     "env": {
       "MCP_REMOTE_URL": "http://localhost:3000/mcp",
-      "MCP_AUTH_TOKEN": "your-strong-token"
+      "MCP_BEARER_TOKEN": "your-bearer-token"
     }
   }
 }
@@ -151,7 +169,7 @@ If your client supports configuring an MCP server with `command` + `args` + `env
 
 - `command`: `npx`
 - `args`: `["gemini-diagram-mcp","proxy"]`
-- `env`: `MCP_REMOTE_URL`, `MCP_AUTH_TOKEN`
+- `env`: `MCP_REMOTE_URL`, `MCP_BEARER_TOKEN`
 
 ## Local (Classic) Installation
 

@@ -20,8 +20,15 @@ Usage:
 
 Environment:
   GEMINI_API_KEY or GOOGLE_API_KEY   Required for stdio/http server modes
-  MCP_AUTH_TOKEN                     Required for http/proxy modes (Bearer token)
+  MCP_AUTH_MODE                      Auth mode for HTTP server: token (default), oidc, none
+  MCP_AUTH_TOKEN                     Auth for token mode (HTTP server) and legacy proxy env var
+  MCP_AUTH_TOKENS                    Optional comma-separated tokens (replaces MCP_AUTH_TOKEN)
+  OIDC_ISSUER                         Required for oidc mode (e.g. https://issuer.example.com/realms/foo)
+  OIDC_AUDIENCE                       Recommended for oidc mode (comma-separated allowed audiences)
+  OIDC_JWKS_URI                       Optional override to skip discovery
+  MCP_ALLOW_QUERY_TOKEN=1             Allow ?token=... (default: enabled for token mode, disabled for oidc)
   MCP_REMOTE_URL                     Proxy remote URL (default: http://localhost:3000/mcp)
+  MCP_BEARER_TOKEN                   Proxy auth bearer token (use for OIDC access tokens)
 
 HTTP server options:
   HOST                               Bind host (default: 0.0.0.0)

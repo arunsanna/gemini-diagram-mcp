@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: gemini-diagram-mcp
+  labels:
+    app.kubernetes.io/name: gemini-diagram-mcp
+spec:
+  selector:
+    app.kubernetes.io/name: gemini-diagram-mcp
+  ports:
+    - name: http
+      port: 3000
+      targetPort: http
+

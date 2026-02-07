@@ -135,7 +135,7 @@ The CLI supports three modes:
 - [x] `generate_image` tool with type auto-detection
 - [x] `refine_image` tool with session state
 - [x] Centralized HTTP server mode (Streamable HTTP + legacy SSE)
-- [x] Required auth token for centralized mode (`MCP_AUTH_TOKEN`)
+- [x] Auth for centralized mode (static token via `MCP_AUTH_TOKEN`, or OIDC JWT via `MCP_AUTH_MODE=oidc`)
 - [x] Stdio proxy mode (no API key on clients)
 - [x] Professional prompt enhancement for each type
 - [ ] Test with Claude Code

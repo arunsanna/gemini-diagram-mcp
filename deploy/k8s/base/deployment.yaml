@@ -1,0 +1,76 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gemini-diagram-mcp
+  labels:
+    app.kubernetes.io/name: gemini-diagram-mcp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: gemini-diagram-mcp
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: gemini-diagram-mcp
+    spec:
+      containers:
+        - name: gemini-diagram-mcp
+          image: ghcr.io/arunsanna/gemini-diagram-mcp:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 3000
+          env:
+            # Required (pick one)
+            - name: GOOGLE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: gemini-diagram-mcp-secrets
+                  key: GOOGLE_API_KEY
+                  optional: true
+            - name: GEMINI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: gemini-diagram-mcp-secrets
+                  key: GEMINI_API_KEY
+                  optional: true
+
+            # Auth defaults to static token mode. See overlays/oidc for per-user OIDC auth.
+            - name: MCP_AUTH_MODE
+              value: token
+            - name: MCP_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: gemini-diagram-mcp-secrets
+                  key: MCP_AUTH_TOKEN
+                  optional: true
+
+            # Server config
+            - name: HOST
+              value: "0.0.0.0"
+            - name: PORT
+              value: "3000"
+            - name: OUTPUT_DIR
+              value: /data/out
+            - name: PUBLIC_BASE_URL
+              value: http://localhost:3000
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: data
+          emptyDir: {}
+

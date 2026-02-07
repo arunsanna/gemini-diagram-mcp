@@ -1,0 +1,17 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: gemini-diagram-mcp
+spec:
+  rules:
+    - host: gemini-mcp.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: gemini-diagram-mcp
+                port:
+                  number: 3000
+

@@ -5,7 +5,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { CallToolResultSchema } from "@modelcontextprotocol/sdk/types.js";
 
 import { GenerateImageSchema, RefineImageSchema } from "./mcp.js";
-import { getPackageVersion, requireEnv } from "./runtime.js";
+import { getPackageVersion } from "./runtime.js";
 
 function normalizeCallToolResult(result: any): any {
   // New protocol returns { content, structuredContent?, isError? }.
@@ -34,7 +34,13 @@ function normalizeRemoteUrl(raw: string): string {
 }
 
 export async function startProxyServer(): Promise<void> {
-  const authToken = requireEnv("MCP_AUTH_TOKEN");
+  const authToken =
+    process.env.MCP_BEARER_TOKEN || process.env.MCP_AUTH_TOKEN;
+  if (!authToken) {
+    throw new Error(
+      "Missing required environment variable: MCP_BEARER_TOKEN (or legacy MCP_AUTH_TOKEN)"
+    );
+  }
   const remoteUrl = normalizeRemoteUrl(
     process.env.MCP_REMOTE_URL ?? "http://localhost:3000/mcp"
   );

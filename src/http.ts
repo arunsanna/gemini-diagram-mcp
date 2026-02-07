@@ -8,7 +8,13 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 
 import { createGeminiDiagramServer } from "./mcp.js";
-import { assertApiKeyPresent, getPackageVersion, requireEnv } from "./runtime.js";
+import {
+  createNoAuthVerifierFromEnv,
+  createOidcAuthVerifierFromEnv,
+  createTokenAuthVerifierFromEnv,
+  parseAuthMode,
+} from "./auth.js";
+import { assertApiKeyPresent, getPackageVersion } from "./runtime.js";
 
 function parsePort(value: string | undefined, fallback: number): number {
   if (!value) return fallback;
@@ -21,21 +27,15 @@ function normalizeBaseUrl(url: string): string {
   return url.endsWith("/") ? url.slice(0, -1) : url;
 }
 
-function extractBearerToken(req: any): string | undefined {
-  const auth = req.headers?.authorization;
-  if (typeof auth === "string") {
-    const m = auth.match(/^Bearer\s+(.+)$/i);
-    if (m) return m[1];
-  }
-
-  const q = req.query?.token;
-  if (typeof q === "string" && q.length > 0) return q;
-  return undefined;
-}
-
 export async function startHttpServer(): Promise<void> {
   assertApiKeyPresent();
-  const authToken = requireEnv("MCP_AUTH_TOKEN");
+  const authMode = parseAuthMode(process.env.MCP_AUTH_MODE);
+  const authVerifier =
+    authMode === "oidc"
+      ? await createOidcAuthVerifierFromEnv()
+      : authMode === "none"
+        ? createNoAuthVerifierFromEnv()
+        : createTokenAuthVerifierFromEnv();
 
   const host = process.env.HOST ?? "0.0.0.0";
   const port = parsePort(process.env.PORT, 3000);
@@ -59,14 +59,24 @@ export async function startHttpServer(): Promise<void> {
     res.status(200).json({ ok: true });
   });
 
-  // Simple Bearer token auth (required).
+  // Authentication (token / OIDC / none).
   app.use((req: any, res: any, next: any) => {
-    const token = extractBearerToken(req);
-    if (!token || token !== authToken) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
-    }
-    next();
+    void (async () => {
+      const result = await authVerifier.verifyRequest(req);
+      if (!result.ok) {
+        res.status(result.status).json({ error: result.error });
+        return;
+      }
+      // Stash claims for potential downstream use/logging.
+      (req as any).mcpAuth = {
+        mode: authVerifier.mode,
+        claims: result.claims,
+      };
+      next();
+    })().catch((error) => {
+      console.error("Auth middleware error:", error);
+      if (!res.headersSent) res.status(500).json({ error: "Internal server error" });
+    });
   });
 
   app.get("/files/:filename", (req: any, res: any) => {
@@ -239,4 +249,3 @@ export async function startHttpServer(): Promise<void> {
   process.on("SIGINT", () => void shutdown("SIGINT"));
   process.on("SIGTERM", () => void shutdown("SIGTERM"));
 }
-

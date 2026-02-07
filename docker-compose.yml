@@ -8,8 +8,17 @@ services:
       - GOOGLE_API_KEY=${GOOGLE_API_KEY}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
 
-      # Required for auth
+      # Auth (choose one)
+      - MCP_AUTH_MODE=${MCP_AUTH_MODE:-token}
+      # Static token mode
       - MCP_AUTH_TOKEN=${MCP_AUTH_TOKEN}
+      - MCP_AUTH_TOKENS=${MCP_AUTH_TOKENS}
+      # OIDC JWT mode
+      - OIDC_ISSUER=${OIDC_ISSUER}
+      - OIDC_AUDIENCE=${OIDC_AUDIENCE}
+      - OIDC_JWKS_URI=${OIDC_JWKS_URI}
+      # Allow ?token=... auth (disabled by default in oidc mode)
+      - MCP_ALLOW_QUERY_TOKEN=${MCP_ALLOW_QUERY_TOKEN}
 
       # Storage (bind-mounted below)
       - OUTPUT_DIR=/data/out
@@ -23,4 +32,3 @@ services:
       - INLINE_IMAGES=${INLINE_IMAGES:-0}
     volumes:
       - ./data:/data
-

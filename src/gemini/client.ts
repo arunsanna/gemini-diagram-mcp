@@ -209,11 +209,18 @@ export const DIAGRAM_TYPES: Record<
   flow: {
     aspectRatio: "16:9",
     composition:
-      "Sequential stages connected by arrows, left-to-right or top-to-bottom",
+      "Sequential stages connected by arrows, left-to-right or top-to-bottom. " +
+      "Use distinct shapes for different step types (decision diamonds, process rectangles, " +
+      "I/O parallelograms). Differentiate arrow styles: solid for main flow, dashed for " +
+      "optional/error paths. Include small icons inside steps when technologies are named.",
   },
   architecture: {
     aspectRatio: "4:3",
-    composition: "System components with connections, layered structure",
+    composition:
+      "Layered system diagram with distinct shapes for different component types. " +
+      "Group related components with subtle background cards. " +
+      "Differentiate arrow styles: solid for sync, dashed for async. " +
+      "Primary services should be visually larger than supporting infrastructure.",
   },
   timeline: {
     aspectRatio: "16:9",
@@ -511,6 +518,98 @@ export function analyzePrompt(prompt: string, options: GenerateOptions = {}): Pr
   return analysis;
 }
 
+// Visual vocabulary and connection styles — only injected for architecture/flow types
+const TECHNICAL_DIAGRAM_PROMPT = `
+VISUAL VOCABULARY:
+- Databases/data stores: Use cylinder shapes (NOT rectangles)
+- Message queues/event buses: Use horizontal pipe or arrow-through-rectangle icons
+- Load balancers/ingress: Use a splitting-arrows or fan-out diamond shape
+- Cloud services: Use cloud silhouettes
+- Containers/pods: Use nested box-in-box to show containment relationships
+- APIs/endpoints: Use a hexagonal gateway shape
+- Users/clients: Use a person silhouette or browser window icon
+- Caches: Use a cylinder with a lightning bolt overlay
+- NEVER render everything as plain rectangles — vary shapes to convey function
+- Use at least 3 distinct shape types
+- Primary services should be visually larger/bolder than supporting infrastructure
+
+CONNECTION STYLES:
+- Solid arrows: synchronous request/response
+- Dashed arrows: asynchronous or event-driven communication
+- Thick arrows: high-throughput data paths
+- Thin arrows: control/management plane
+- Label arrows with protocol or action when relevant (e.g., "REST", "gRPC", "pub/sub")
+- Use arrowhead direction to show data/request flow
+`;
+
+// Shape hints: each entry has a regex pattern (word-boundary safe), a shape
+// category (for deduplication), and the rendering instruction.
+const COMPONENT_SHAPE_HINTS: Array<{
+  pattern: RegExp;
+  category: string;
+  hint: string;
+}> = [
+  // Databases — cylinder shape
+  { pattern: /\b(database|datastore|data store)\b/i, category: "database", hint: "render databases as cylinder shapes" },
+  { pattern: /\b(postgres|postgresql|mysql|mariadb)\b/i, category: "database", hint: "render as a cylinder with a recognizable database icon" },
+  { pattern: /\b(mongo|mongodb|dynamodb|cassandra)\b/i, category: "database", hint: "render as a cylinder with a recognizable database icon" },
+  { pattern: /\b(redis)\b/i, category: "cache-db", hint: "render Redis as a cylinder with a cache/speed icon overlay" },
+  { pattern: /\b(elasticsearch|opensearch)\b/i, category: "database", hint: "render as a cylinder with a search icon overlay" },
+
+  // Message queues — pipe shape
+  { pattern: /\b(queue|message queue|event bus)\b/i, category: "queue", hint: "render queues as a horizontal pipe with arrow icon" },
+  { pattern: /\b(kafka|rabbitmq|sqs|nats|pulsar)\b/i, category: "queue", hint: "render as a horizontal pipe icon representing a message queue" },
+
+  // Load balancers
+  { pattern: /\b(load balancer|lb|ingress)\b/i, category: "lb", hint: "render as a splitting-arrows diamond shape" },
+  { pattern: /\b(nginx|haproxy|envoy|traefik)\b/i, category: "lb", hint: "render as a gateway/proxy diamond shape" },
+
+  // Containers / orchestration
+  { pattern: /\b(kubernetes|k8s)\b/i, category: "k8s", hint: "render with a container orchestration icon, use nested boxes for pods" },
+  { pattern: /\b(docker)\b/i, category: "container", hint: "render with a container icon, use nested box for containerized services" },
+  { pattern: /\b(container)\b/i, category: "container", hint: "render as a nested box-in-box" },
+  { pattern: /\b(pod)\b/i, category: "pod", hint: "render as a nested box group with multiple containers inside" },
+
+  // Cloud providers
+  { pattern: /\baws\b/i, category: "cloud", hint: "render AWS services with cloud silhouette icons" },
+  { pattern: /\b(gcp|google cloud)\b/i, category: "cloud", hint: "render GCP services with cloud silhouette icons" },
+  { pattern: /\b(azure)\b/i, category: "cloud", hint: "render Azure services with cloud silhouette icons" },
+
+  // Specific cloud services
+  { pattern: /\bs3\b/i, category: "storage", hint: "render S3 as a bucket/storage shape" },
+  { pattern: /\b(lambda|cloud function|serverless)\b/i, category: "serverless", hint: "render serverless functions with a function/event icon" },
+
+  // Caches
+  { pattern: /\b(cache|memcached)\b/i, category: "cache", hint: "render as a cylinder with a lightning bolt overlay" },
+  { pattern: /\bcdn\b/i, category: "cdn", hint: "render as a globe/network distribution icon" },
+
+  // APIs / gateways
+  { pattern: /\b(api gateway|api)\b/i, category: "api", hint: "render as a hexagonal gateway shape" },
+
+  // Users / clients
+  { pattern: /\b(user|end user)\b/i, category: "user", hint: "render as a person silhouette icon" },
+  { pattern: /\b(browser|web client)\b/i, category: "client", hint: "render as a browser window icon" },
+
+  // Monitoring
+  { pattern: /\b(prometheus|grafana|datadog|monitoring)\b/i, category: "monitoring", hint: "render with a dashboard/chart mini-icon" },
+
+  // Infrastructure as code
+  { pattern: /\b(terraform|pulumi)\b/i, category: "iac", hint: "render with an infrastructure-as-code icon" },
+];
+
+function detectShapeHints(prompt: string): string[] {
+  const seen = new Set<string>();
+  const hints: string[] = [];
+  for (const { pattern, category, hint } of COMPONENT_SHAPE_HINTS) {
+    if (seen.has(category)) continue;
+    if (pattern.test(prompt)) {
+      seen.add(category);
+      hints.push(`- ${hint}`);
+    }
+  }
+  return hints;
+}
+
 // Resolution map for size parameter
 const SIZE_MAP: Record<string, string> = {
   "1K": "approximately 1024 pixels on the longest side",
@@ -530,6 +629,17 @@ export function buildPromptFromContext(
   const aspectRatio = options.aspectRatio || typeConfig.aspectRatio;
   const sizeDesc = SIZE_MAP[options.size || "2K"] || SIZE_MAP["2K"];
 
+  // Inject visual vocabulary + shape hints only for architecture/flow types
+  const isTechnical = diagramType === "architecture" || diagramType === "flow";
+  let technicalBlock = "";
+  if (isTechnical) {
+    const hints = detectShapeHints(context);
+    const hintsSection = hints.length > 0
+      ? `\nCOMPONENT-SPECIFIC VISUAL TREATMENT:\n${hints.join("\n")}\n`
+      : "";
+    technicalBlock = `${TECHNICAL_DIAGRAM_PROMPT}${hintsSection}`;
+  }
+
   const prompt = `Create a professional ${diagramType} diagram.
 
 CONTEXT:
@@ -537,7 +647,7 @@ ${context}
 
 COMPOSITION GUIDANCE:
 ${typeConfig.composition}
-
+${technicalBlock}
 IMAGE SPECIFICATIONS:
 - Aspect ratio: ${aspectRatio}
 - Resolution: High quality, ${sizeDesc}

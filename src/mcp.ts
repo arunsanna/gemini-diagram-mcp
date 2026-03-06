@@ -12,7 +12,13 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { randomUUID } from "node:crypto";
 
-import { GeminiImageClient, analyzePrompt } from "./gemini/client.js";
+import {
+  GeminiImageClient,
+  analyzePrompt,
+  DIAGRAM_TYPES,
+  ASPECT_RATIO_VALUES,
+  buildPromptFromContext,
+} from "./gemini/client.js";
 
 export const GenerateImageSchema = z.object({
   prompt: z
@@ -53,6 +59,19 @@ export const GenerateImageSchema = z.object({
 
 export const RefineImageSchema = z.object({
   refinement: z.string().describe("Description of changes to make to the last image"),
+});
+
+export const PrepareImageSchema = z.object({
+  prompt: z
+    .string()
+    .optional()
+    .describe(
+      "Optional draft prompt to analyze. If provided, returns recommendations and a polished version."
+    ),
+  type: z
+    .string()
+    .optional()
+    .describe("Optional type hint to get specific guidance for that type"),
 });
 
 export interface CreateGeminiDiagramServerOptions {
@@ -242,6 +261,26 @@ export function createGeminiDiagramServer(
           };
         }
 
+        // Enforce dimension compliance — reject with actionable error so AI retries
+        if (result.dimensionWarning) {
+          const dimInfo = result.actualWidth && result.actualHeight
+            ? `${result.actualWidth}x${result.actualHeight}px`
+            : "unknown";
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: `IMAGE REJECTED — dimensions do not match request.\n` +
+                  `Requested: ${finalSize} at ${finalAspectRatio} | Received: ${dimInfo}\n` +
+                  `${result.dimensionWarning}\n\n` +
+                  `ACTION REQUIRED: Retry with a simpler prompt, or adjust size/aspect_ratio parameters to match what the API can deliver. ` +
+                  `The file was saved at ${result.outputPath} but does not meet the requested specifications.`,
+              },
+            ],
+            isError: true,
+          };
+        }
+
         last = {
           lastPrompt: prompt,
           lastOutputPath: result.outputPath!,
@@ -250,8 +289,11 @@ export function createGeminiDiagramServer(
           size: finalSize,
         };
 
+        const dimStr = result.actualWidth && result.actualHeight
+          ? ` [${result.actualWidth}x${result.actualHeight}px]`
+          : "";
         const lines: string[] = [
-          `Generated ${finalType} (${result.aspectRatio}, ${finalSize})`,
+          `Generated ${finalType} (${result.aspectRatio}, ${finalSize})${dimStr}`,
           `Saved: ${result.outputPath}`,
         ];
 
@@ -373,6 +415,93 @@ export function createGeminiDiagramServer(
           isError: true,
         };
       }
+    }
+  );
+
+  server.tool(
+    "prepare_image",
+    "Get guidance before generating an image. Call this FIRST to understand supported parameters, get prompt recommendations, and receive a polished prompt. This avoids rejected generations and wasted API calls.",
+    PrepareImageSchema.shape,
+    async ({ prompt, type }) => {
+      const supportedTypes = Object.entries(DIAGRAM_TYPES).map(
+        ([name, config]) => `  - ${name}: ${config.composition} (default aspect: ${config.aspectRatio})`
+      );
+
+      const supportedRatios = Object.keys(ASPECT_RATIO_VALUES).join(", ");
+
+      const sections: string[] = [
+        "=== GEMINI IMAGE GENERATION GUIDE ===",
+        "",
+        "SUPPORTED TYPES:",
+        ...supportedTypes,
+        "",
+        `SUPPORTED ASPECT RATIOS: ${supportedRatios}`,
+        "  Tip: Let the type auto-select the ratio, or override with aspect_ratio parameter.",
+        "",
+        "SUPPORTED SIZES: 1K, 2K (default), 4K",
+        "  - 1K: ~1024px longest side (fast, lightweight)",
+        "  - 2K: ~2048px longest side (good balance)",
+        "  - 4K: ~4096px longest side (high-res, may be capped by API for complex prompts)",
+        "",
+        "PROMPT BEST PRACTICES:",
+        "  - Be specific about data, labels, and structure",
+        "  - Describe the content, not the style (styling is handled automatically)",
+        "  - Include actual text/labels you want rendered",
+        "  - For charts: specify data points, axis labels, legend items",
+        "  - For flows: list the steps/stages explicitly",
+        "  - For architecture: name the components and their connections",
+        "  - Keep prompts focused — overly complex prompts may cause dimension/quality issues",
+        "",
+        "WHAT TO AVOID:",
+        "  - Do NOT specify colors, fonts, or visual styling (the system prompt handles this)",
+        "  - Do NOT request dark backgrounds (white/light backgrounds are enforced)",
+        "  - Do NOT use aspect ratio 2:1 (use 16:9 instead)",
+        "  - Do NOT request extremely complex layouts in a single image",
+        "  - Do NOT include instructions like 'make it pretty' — focus on content",
+      ];
+
+      if (prompt) {
+        const analysis = analyzePrompt(prompt, {
+          type: type && type !== "auto" ? type : undefined,
+        });
+
+        const { prompt: polished, aspectRatio, diagramType } =
+          buildPromptFromContext(prompt, {
+            type: type && type !== "auto" ? type : undefined,
+            aspectRatio: analysis.recommendedAspectRatio,
+            size: analysis.recommendedSize,
+          });
+
+        sections.push(
+          "",
+          "=== ANALYSIS OF YOUR PROMPT ===",
+          `Detected type: ${analysis.recommendedType}`,
+          `Recommended aspect ratio: ${analysis.recommendedAspectRatio}`,
+          `Recommended size: ${analysis.recommendedSize}`,
+        );
+
+        if (analysis.suggestions && analysis.suggestions.length > 0) {
+          sections.push(`Notes: ${analysis.suggestions.join(". ")}`);
+        }
+
+        if (!analysis.shouldProceed && analysis.clarifyingQuestion) {
+          sections.push("", "CLARIFICATION NEEDED:", analysis.clarifyingQuestion);
+        }
+
+        sections.push(
+          "",
+          "=== RECOMMENDED CALL ===",
+          "Call generate_image with:",
+          `  prompt: "${prompt}"`,
+          `  type: "${diagramType}"`,
+          `  aspect_ratio: "${aspectRatio}"`,
+          `  size: "${analysis.recommendedSize}"`,
+        );
+      }
+
+      return {
+        content: [{ type: "text" as const, text: sections.join("\n") }],
+      };
     }
   );
 

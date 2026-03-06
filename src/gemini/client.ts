@@ -106,6 +106,57 @@ function formatFromMimeType(mimeType: string | undefined): ImageFormat | null {
   return IMAGE_FORMATS.find((format) => format.mimeType === normalized) ?? null;
 }
 
+/**
+ * Extract pixel dimensions from a PNG or JPEG buffer.
+ */
+function getImageDimensions(data: Buffer): { width: number; height: number } | null {
+  // PNG: width at bytes 16-19, height at bytes 20-23 (big-endian in IHDR chunk)
+  if (data.length >= 24 && data.subarray(0, 8).equals(PNG_SIGNATURE)) {
+    const width = data.readUInt32BE(16);
+    const height = data.readUInt32BE(20);
+    return { width, height };
+  }
+
+  // JPEG: scan for SOF0 (0xFFC0) or SOF2 (0xFFC2) marker
+  if (data.length >= 4 && data.subarray(0, 3).equals(JPEG_SIGNATURE)) {
+    let offset = 2;
+    while (offset < data.length - 9) {
+      if (data[offset] !== 0xFF) break;
+      const marker = data[offset + 1];
+      // SOF0 or SOF2
+      if (marker === 0xC0 || marker === 0xC2) {
+        const height = data.readUInt16BE(offset + 5);
+        const width = data.readUInt16BE(offset + 7);
+        return { width, height };
+      }
+      // Skip to next marker
+      const segLen = data.readUInt16BE(offset + 2);
+      offset += 2 + segLen;
+    }
+  }
+
+  return null;
+}
+
+// Expected minimum pixel width for each size tier
+const SIZE_MIN_PIXELS: Record<string, number> = {
+  "1K": 900,
+  "2K": 1800,
+  "4K": 3600,
+};
+
+// Supported aspect ratios and their numeric values
+export const ASPECT_RATIO_VALUES: Record<string, number> = {
+  "1:1": 1,
+  "2:3": 2 / 3,
+  "3:2": 3 / 2,
+  "3:4": 3 / 4,
+  "4:3": 4 / 3,
+  "9:16": 9 / 16,
+  "16:9": 16 / 9,
+  "21:9": 21 / 9,
+};
+
 function resolveOutputPathForFormat(outputPath: string, format: ImageFormat): string {
   const parsed = path.parse(outputPath);
 
@@ -132,6 +183,11 @@ export interface GenerationResult {
   aspectRatio?: string;
   imageData?: Buffer;
   mimeType?: string;
+  actualWidth?: number;
+  actualHeight?: number;
+  requestedSize?: string;
+  requestedAspectRatio?: string;
+  dimensionWarning?: string;
 }
 
 // ============================================================================
@@ -271,7 +327,14 @@ const TYPE_KEYWORDS: Record<string, string[]> = {
 // SYSTEM PROMPT - Consistent styling for all generated images
 // ============================================================================
 
-const SYSTEM_PROMPT = `BACKGROUND REQUIREMENTS:
+const SYSTEM_PROMPT = `RENDERING QUALITY:
+- Ultra-sharp edges on all text, lines, icons, and shapes — no blur or anti-aliasing artifacts
+- Crisp 1px borders where borders are used; never fuzzy or semi-transparent
+- All text must be pixel-perfect, fully legible, and never truncated or overlapping
+- High-contrast rendering: foreground elements must stand out clearly from backgrounds
+- Vector-quality appearance: clean geometry, precise alignment, no rasterization noise
+
+BACKGROUND REQUIREMENTS:
 - Primary background: Clean white (#ffffff) or very light gray (#f8fafc)
 - Secondary backgrounds: Light gray (#f1f5f9) for cards/containers
 - NO dark backgrounds - images must work on white web pages
@@ -285,6 +348,7 @@ TYPOGRAPHY REQUIREMENTS:
 - Numbers/Data: Tabular figures, medium weight
 - NO decorative, script, or novelty fonts
 - Minimum font size equivalent to 14pt for readability
+- All text must be sharp and crisp, never blurry or pixelated
 
 COLOR PALETTE:
 - Background: White #ffffff or light gray #f8fafc
@@ -303,7 +367,13 @@ STYLE:
 - Consistent 8px or 16px spacing
 - Rounded corners (8-12px radius)
 - Professional enterprise look
-- Works seamlessly on white web pages`;
+- Works seamlessly on white web pages
+
+WATERMARK — THIS IS REQUIRED, DO NOT SKIP:
+- You MUST render the text "arunlab.com" in the bottom-right corner of the image
+- Use light gray color (#94a3b8), small font size (about 10pt), slightly transparent
+- Position it with a small margin from the bottom and right edges
+- This watermark must appear on EVERY generated image without exception`;
 
 // Detection result with confidence
 export interface TypeDetection {
@@ -479,7 +549,8 @@ IMPORTANT:
 - Follow the design system exactly (white background, SaaS aesthetic)
 - Make the visualization clear and immediately understandable
 - Use the standard color palette for data representation
-- Maintain the specified ${aspectRatio} aspect ratio precisely`;
+- Maintain the specified ${aspectRatio} aspect ratio precisely
+- MANDATORY: Include "arunlab.com" watermark text in the bottom-right corner (light gray, small, subtle)`;
 
   return { prompt, aspectRatio, diagramType };
 }
@@ -585,6 +656,41 @@ export class GeminiImageClient {
           : detectedFormat;
       const finalOutputPath = resolveOutputPathForFormat(outputPath, finalFormat);
 
+      // Extract actual dimensions
+      const dims = getImageDimensions(imageData);
+      const actualWidth = dims?.width ?? 0;
+      const actualHeight = dims?.height ?? 0;
+
+      // Validate aspect ratio
+      const warnings: string[] = [];
+      if (dims && aspectRatio) {
+        const expectedRatio = ASPECT_RATIO_VALUES[aspectRatio];
+        if (expectedRatio) {
+          const actualRatio = actualWidth / actualHeight;
+          const ratioDiff = Math.abs(actualRatio - expectedRatio) / expectedRatio;
+          if (ratioDiff > 0.15) {
+            const actualApprox = `${actualWidth}:${actualHeight}`;
+            warnings.push(
+              `Aspect ratio mismatch: requested ${aspectRatio} but received ~${actualApprox} (${actualWidth}x${actualHeight}px). ` +
+              `Try a simpler prompt or a different aspect_ratio.`
+            );
+          }
+        }
+      }
+
+      // Validate size
+      if (dims && imageSize) {
+        const minPixels = SIZE_MIN_PIXELS[imageSize];
+        const longestSide = Math.max(actualWidth, actualHeight);
+        if (minPixels && longestSide < minPixels) {
+          const actualTier = longestSide >= 3600 ? "4K" : longestSide >= 1800 ? "2K" : "1K";
+          warnings.push(
+            `Resolution mismatch: requested ${imageSize} (>=${minPixels}px) but received ${actualWidth}x${actualHeight}px (${actualTier}). ` +
+            `The Gemini API may cap resolution for complex prompts. Try size="1K" or simplify the prompt.`
+          );
+        }
+      }
+
       // Prefer the actual bytes over the declared MIME type if they disagree.
       fs.writeFileSync(finalOutputPath, imageData);
 
@@ -595,6 +701,11 @@ export class GeminiImageClient {
         aspectRatio: aspectRatio,
         imageData,
         mimeType: detectedFormat.mimeType,
+        actualWidth,
+        actualHeight,
+        requestedSize: imageSize,
+        requestedAspectRatio: aspectRatio,
+        dimensionWarning: warnings.length > 0 ? warnings.join(" | ") : undefined,
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);

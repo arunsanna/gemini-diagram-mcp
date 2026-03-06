@@ -458,6 +458,17 @@ export function createGeminiDiagramServer(
         "  - Do NOT use aspect ratio 2:1 (use 16:9 instead)",
         "  - Do NOT request extremely complex layouts in a single image",
         "  - Do NOT include instructions like 'make it pretty' — focus on content",
+        "",
+        "ARCHITECTURE & FLOW DIAGRAM TIPS:",
+        "  - Name specific technologies (e.g., 'PostgreSQL', 'Redis', 'Kubernetes') so the",
+        "    model renders recognizable icons instead of plain boxes",
+        "  - Describe containment relationships (e.g., 'containers running inside a K8s pod')",
+        "  - Specify connection types: sync/async, protocol (REST, gRPC, pub/sub)",
+        "  - Mention data stores separately from compute — they render as different shapes",
+        "  - Group components by layer (ingress, application, data, external)",
+        "  - The model auto-detects technologies and uses: cylinders for databases,",
+        "    cloud shapes for cloud services, nested boxes for containers, pipes for queues,",
+        "    diamonds for load balancers, and brand icons for named technologies",
       ];
 
       if (prompt) {

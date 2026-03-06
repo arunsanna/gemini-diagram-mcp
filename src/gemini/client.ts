@@ -209,11 +209,22 @@ export const DIAGRAM_TYPES: Record<
   flow: {
     aspectRatio: "16:9",
     composition:
-      "Sequential stages connected by arrows, left-to-right or top-to-bottom",
+      "Sequential stages connected by arrows, left-to-right or top-to-bottom. " +
+      "Use distinct shapes for different step types (decision diamonds, process rectangles, " +
+      "I/O parallelograms). Differentiate arrow styles: solid for main flow, dashed for " +
+      "optional/error paths. Include small icons inside steps when technologies are named.",
   },
   architecture: {
     aspectRatio: "4:3",
-    composition: "System components with connections, layered structure",
+    composition:
+      "Layered system diagram with recognizable technology icons. " +
+      "Use cylinders for databases, cloud shapes for external services, " +
+      "nested boxes for container/pod relationships, and distinct shapes " +
+      "for different component types (compute, storage, networking, queues). " +
+      "Differentiate arrow styles: solid for sync, dashed for async. " +
+      "Group related components with subtle background cards. " +
+      "Include small technology logos/icons next to component labels. " +
+      "Primary services should be visually larger than supporting infrastructure.",
   },
   timeline: {
     aspectRatio: "16:9",
@@ -369,6 +380,32 @@ STYLE:
 - Professional enterprise look
 - Works seamlessly on white web pages
 
+VISUAL VOCABULARY FOR TECHNICAL DIAGRAMS:
+- Databases/data stores: Use cylinder shapes (NOT rectangles)
+- Message queues/event buses: Use arrow-through-rectangle or horizontal pipe icons
+- Load balancers/ingress: Use a splitting-arrows or fan-out diamond shape
+- Cloud services: Use cloud silhouettes with provider-appropriate styling
+- Containers/pods: Use nested box-in-box to show containment relationships
+- APIs/endpoints: Use a gateway/plug icon or hexagonal shape
+- Users/clients: Use a person silhouette or browser window icon
+- Caches: Use a cylinder with a lightning bolt overlay
+- Monitoring/logging: Use a dashboard or chart mini-icon
+- When well-known technology brands are mentioned (Kubernetes, Docker, Redis,
+  PostgreSQL, React, Go, Python, nginx, AWS, GCP, Azure, Terraform, etc.),
+  render a simplified but recognizable icon or logo mark alongside the text label
+- NEVER render everything as plain rectangles — vary shapes to convey function
+- Use at least 3 distinct shape types in any architecture or flow diagram
+- Primary services should be visually larger/bolder than supporting infrastructure
+
+CONNECTION STYLES FOR DIAGRAMS:
+- Solid arrows: synchronous request/response
+- Dashed arrows: asynchronous or event-driven communication
+- Thick arrows: high-throughput data paths
+- Thin arrows: control/management plane
+- Label arrows with protocol or action when relevant (e.g., "REST", "gRPC", "pub/sub", "SQL")
+- Use arrowhead direction to show data/request flow
+- Color-code arrows when showing distinct paths (e.g., read vs write)
+
 WATERMARK — THIS IS REQUIRED, DO NOT SKIP:
 - You MUST render the text "arunlab.com" in the bottom-right corner of the image
 - Use light gray color (#94a3b8), small font size (about 10pt), slightly transparent
@@ -511,6 +548,61 @@ export function analyzePrompt(prompt: string, options: GenerateOptions = {}): Pr
   return analysis;
 }
 
+// Shape hints injected when architecture/flow keywords are detected in the prompt
+const COMPONENT_SHAPE_HINTS: Record<string, string> = {
+  database: "render as a cylinder shape",
+  db: "render as a cylinder shape",
+  postgres: "render as a cylinder with PostgreSQL elephant icon",
+  postgresql: "render as a cylinder with PostgreSQL elephant icon",
+  mysql: "render as a cylinder with MySQL dolphin icon",
+  mongo: "render as a cylinder with MongoDB leaf icon",
+  mongodb: "render as a cylinder with MongoDB leaf icon",
+  redis: "render as a cylinder with Redis diamond icon",
+  dynamodb: "render as a cylinder with DynamoDB icon",
+  queue: "render as a horizontal pipe with arrow icon",
+  kafka: "render as a pipe icon with Kafka logo",
+  rabbitmq: "render as a pipe icon with RabbitMQ logo",
+  sqs: "render as a pipe icon with AWS SQS logo",
+  "load balancer": "render as a splitting-arrows diamond shape",
+  nginx: "render with nginx green icon",
+  kubernetes: "render with K8s steering wheel icon, use nested boxes for pods",
+  k8s: "render with K8s steering wheel icon, use nested boxes for pods",
+  docker: "render with Docker whale icon, use nested box for container",
+  container: "render as a nested box-in-box",
+  pod: "render as a nested box-in-box with multiple containers inside",
+  aws: "render with AWS cloud icon",
+  gcp: "render with Google Cloud icon",
+  azure: "render with Azure cloud icon",
+  s3: "render as a bucket shape with AWS S3 icon",
+  lambda: "render with AWS Lambda icon",
+  cache: "render as a cylinder with lightning bolt overlay",
+  cdn: "render as a globe/network icon",
+  api: "render as a hexagonal gateway shape",
+  gateway: "render as a hexagonal gateway shape",
+  user: "render as a person silhouette icon",
+  client: "render as a browser window icon",
+  browser: "render as a browser window icon",
+  terraform: "render with Terraform purple icon",
+  react: "render with React atom icon",
+  node: "render with Node.js green icon",
+  python: "render with Python snake icon",
+  go: "render with Go gopher icon",
+  elasticsearch: "render as a cylinder with Elasticsearch icon",
+  prometheus: "render with Prometheus fire icon",
+  grafana: "render with Grafana orange icon",
+};
+
+function detectShapeHints(prompt: string): string[] {
+  const lower = prompt.toLowerCase();
+  const hints: string[] = [];
+  for (const [keyword, hint] of Object.entries(COMPONENT_SHAPE_HINTS)) {
+    if (lower.includes(keyword)) {
+      hints.push(`- "${keyword}": ${hint}`);
+    }
+  }
+  return hints;
+}
+
 // Resolution map for size parameter
 const SIZE_MAP: Record<string, string> = {
   "1K": "approximately 1024 pixels on the longest side",
@@ -530,6 +622,15 @@ export function buildPromptFromContext(
   const aspectRatio = options.aspectRatio || typeConfig.aspectRatio;
   const sizeDesc = SIZE_MAP[options.size || "2K"] || SIZE_MAP["2K"];
 
+  // Detect shape hints for architecture/flow diagrams
+  const shapeHintsBlock =
+    (diagramType === "architecture" || diagramType === "flow") ?
+      (() => {
+        const hints = detectShapeHints(context);
+        if (hints.length === 0) return "";
+        return `\nCOMPONENT-SPECIFIC VISUAL TREATMENT:\n${hints.join("\n")}\n`;
+      })() : "";
+
   const prompt = `Create a professional ${diagramType} diagram.
 
 CONTEXT:
@@ -537,7 +638,7 @@ ${context}
 
 COMPOSITION GUIDANCE:
 ${typeConfig.composition}
-
+${shapeHintsBlock}
 IMAGE SPECIFICATIONS:
 - Aspect ratio: ${aspectRatio}
 - Resolution: High quality, ${sizeDesc}

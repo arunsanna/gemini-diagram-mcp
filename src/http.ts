@@ -105,6 +105,23 @@ export async function startHttpServer(): Promise<void> {
   // Store transports by session ID (both Streamable HTTP and legacy SSE).
   const transports: Record<string, StreamableHTTPServerTransport | SSEServerTransport> =
     Object.create(null);
+  const sessionLastActive: Record<string, number> = Object.create(null);
+
+  const SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
+  const MAX_SESSIONS = 100;
+
+  // Periodic cleanup of stale sessions
+  const cleanupInterval = setInterval(() => {
+    const now = Date.now();
+    for (const sid of Object.keys(sessionLastActive)) {
+      if (now - sessionLastActive[sid] > SESSION_TIMEOUT_MS) {
+        try { transports[sid]?.close(); } catch { /* ignore */ }
+        delete transports[sid];
+        delete sessionLastActive[sid];
+      }
+    }
+  }, 60_000); // check every minute
+  cleanupInterval.unref();
 
   // Streamable HTTP transport (recommended)
   app.all("/mcp", async (req: any, res: any) => {
@@ -116,6 +133,7 @@ export async function startHttpServer(): Promise<void> {
         const existing = transports[sessionId];
         if (existing instanceof StreamableHTTPServerTransport) {
           transport = existing;
+          sessionLastActive[sessionId] = Date.now();
         } else {
           res.status(400).json({
             jsonrpc: "2.0",
@@ -129,17 +147,29 @@ export async function startHttpServer(): Promise<void> {
           return;
         }
       } else if (!sessionId && req.method === "POST" && isInitializeRequest(req.body)) {
+        // Enforce max sessions
+        if (Object.keys(transports).length >= MAX_SESSIONS) {
+          res.status(503).json({
+            jsonrpc: "2.0",
+            error: { code: -32000, message: "Too many active sessions. Try again later." },
+            id: null,
+          });
+          return;
+        }
+
         transport = new StreamableHTTPServerTransport({
           sessionIdGenerator: () => randomUUID(),
           onsessioninitialized: (sid) => {
             transports[sid] = transport;
+            sessionLastActive[sid] = Date.now();
           },
         });
 
         transport.onclose = () => {
           const sid = transport.sessionId;
-          if (sid && transports[sid]) {
+          if (sid) {
             delete transports[sid];
+            delete sessionLastActive[sid];
           }
         };
 
@@ -181,8 +211,10 @@ export async function startHttpServer(): Promise<void> {
     try {
       const transport = new SSEServerTransport("/messages", res);
       transports[transport.sessionId] = transport;
+      sessionLastActive[transport.sessionId] = Date.now();
       res.on("close", () => {
         delete transports[transport.sessionId];
+        delete sessionLastActive[transport.sessionId];
       });
 
       const server = createGeminiDiagramServer({
@@ -212,6 +244,7 @@ export async function startHttpServer(): Promise<void> {
       return;
     }
 
+    sessionLastActive[sessionId] = Date.now();
     await existing.handlePostMessage(req, res, req.body);
   });
 
@@ -230,6 +263,7 @@ export async function startHttpServer(): Promise<void> {
 
   async function shutdown(signal: string) {
     console.error(`Shutting down (${signal})...`);
+    clearInterval(cleanupInterval);
     httpServer.close();
     const ids = Object.keys(transports);
     await Promise.all(

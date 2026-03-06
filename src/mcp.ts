@@ -266,6 +266,10 @@ export function createGeminiDiagramServer(
           const dimInfo = result.actualWidth && result.actualHeight
             ? `${result.actualWidth}x${result.actualHeight}px`
             : "unknown";
+          // Clean up the non-compliant file to avoid orphaned rejects
+          if (result.outputPath) {
+            try { fs.unlinkSync(result.outputPath); } catch { /* ignore */ }
+          }
           return {
             content: [
               {
@@ -273,8 +277,7 @@ export function createGeminiDiagramServer(
                 text: `IMAGE REJECTED — dimensions do not match request.\n` +
                   `Requested: ${finalSize} at ${finalAspectRatio} | Received: ${dimInfo}\n` +
                   `${result.dimensionWarning}\n\n` +
-                  `ACTION REQUIRED: Retry with a simpler prompt, or adjust size/aspect_ratio parameters to match what the API can deliver. ` +
-                  `The file was saved at ${result.outputPath} but does not meet the requested specifications.`,
+                  `ACTION REQUIRED: Retry with a simpler prompt, or adjust size/aspect_ratio parameters to match what the API can deliver.`,
               },
             ],
             isError: true,

@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "node:crypto";
 import { createRemoteJWKSet, jwtVerify, type JWTPayload } from "jose";
 
 export type McpAuthMode = "token" | "oidc" | "none";
@@ -62,7 +63,13 @@ export function createTokenAuthVerifierFromEnv(): {
     async verifyRequest(req: any): Promise<AuthResult> {
       const token = extractBearerToken(req, { allowQueryToken });
       if (!token) return { ok: false, status: 401, error: "Unauthorized" };
-      if (!tokens.includes(token)) {
+      const tokenBuf = Buffer.from(token);
+      const matched = tokens.some((t) => {
+        const expectedBuf = Buffer.from(t);
+        if (tokenBuf.length !== expectedBuf.length) return false;
+        return timingSafeEqual(tokenBuf, expectedBuf);
+      });
+      if (!matched) {
         return { ok: false, status: 401, error: "Unauthorized" };
       }
       return { ok: true };

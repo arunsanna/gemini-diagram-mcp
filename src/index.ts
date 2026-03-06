@@ -35,7 +35,7 @@ HTTP server options:
   PORT                               Bind port (default: 3000)
   OUTPUT_DIR                         Output directory (default: ./data/out)
   PUBLIC_BASE_URL                    Base URL for links (default: http://localhost:$PORT)
-  INLINE_IMAGES=1                    Include base64 PNG in tool results (optional)
+  INLINE_IMAGES=1                    Include base64 image data in tool results (optional)
 `);
 }
 

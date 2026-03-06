@@ -78,7 +78,7 @@ export interface CreateGeminiDiagramServerOptions {
    */
   allowSubdirsInOutput?: boolean;
   /**
-   * If true, include an MCP `image` content block (base64 PNG) in the tool result.
+   * If true, include an MCP `image` content block in the tool result.
    */
   inlineImages?: boolean;
 }
@@ -105,26 +105,21 @@ function slugFromPrompt(prompt: string): string {
   return words.join("_") || "image";
 }
 
-function ensurePngExtension(name: string): string {
-  return name.toLowerCase().endsWith(".png") ? name : `${name}.png`;
-}
-
 function sanitizeFilename(input: string): string {
   const base = path.basename(input);
   // Keep it simple and cross-platform.
   let cleaned = base.replace(/[^a-zA-Z0-9._-]/g, "_");
-  cleaned = ensurePngExtension(cleaned);
 
   // Avoid empty names.
-  if (cleaned === ".png" || cleaned.trim() === "") {
-    cleaned = `image_${randomUUID().slice(0, 8)}.png`;
+  if (cleaned === "." || cleaned.trim() === "") {
+    cleaned = `image_${randomUUID().slice(0, 8)}`;
   }
 
   // Conservative length guard.
   const MAX_LEN = 180;
   if (cleaned.length > MAX_LEN) {
     cleaned = cleaned.slice(0, MAX_LEN);
-    cleaned = ensurePngExtension(cleaned.replace(/\.png$/i, ""));
+    cleaned = cleaned.replace(/\.+$/g, "");
   }
 
   return cleaned;
@@ -142,10 +137,9 @@ function resolveOutputPath(
     }
 
     if (opts.allowSubdirsInOutput) {
-      const withExt = ensurePngExtension(output);
       return {
-        outputPath: path.resolve(outputDir, withExt),
-        filenameForUrl: path.basename(withExt),
+        outputPath: path.resolve(outputDir, output),
+        filenameForUrl: path.basename(output),
       };
     }
 
@@ -157,7 +151,7 @@ function resolveOutputPath(
     };
   }
 
-  const auto = `${slugFromPrompt(prompt)}_${randomUUID().slice(0, 8)}.png`;
+  const auto = `${slugFromPrompt(prompt)}_${randomUUID().slice(0, 8)}`;
   return {
     outputPath: path.resolve(outputDir, auto),
     filenameForUrl: path.basename(auto),
@@ -215,7 +209,7 @@ export function createGeminiDiagramServer(
           };
         }
 
-        const { outputPath, filenameForUrl } = resolveOutputPath(
+        const { outputPath } = resolveOutputPath(
           outputDir,
           output,
           prompt,
@@ -261,8 +255,9 @@ export function createGeminiDiagramServer(
           `Saved: ${result.outputPath}`,
         ];
 
-        if (publicBaseUrl && filenameForUrl && isPathInsideRoot(outputDir, result.outputPath!)) {
-          lines.push(`Download: ${publicBaseUrl}/files/${encodeURIComponent(filenameForUrl)}`);
+        const resultFilename = path.basename(result.outputPath!);
+        if (publicBaseUrl && isPathInsideRoot(outputDir, result.outputPath!)) {
+          lines.push(`Download: ${publicBaseUrl}/files/${encodeURIComponent(resultFilename)}`);
           lines.push("Note: download requires MCP_AUTH_TOKEN (Authorization header or ?token=...).");
         }
 
@@ -281,7 +276,7 @@ export function createGeminiDiagramServer(
           content.push({
             type: "image",
             data: result.imageData.toString("base64"),
-            mimeType: "image/png",
+            mimeType: result.mimeType ?? "image/png",
           });
         }
 
@@ -321,7 +316,10 @@ export function createGeminiDiagramServer(
           path.extname(last.lastOutputPath)
         );
         const dir = path.dirname(last.lastOutputPath);
-        const refinedPath = path.join(dir, `${baseName}_refined_${randomUUID().slice(0, 8)}.png`);
+        const refinedPath = path.join(
+          dir,
+          `${baseName}_refined_${randomUUID().slice(0, 8)}`
+        );
 
         const result = await client.refine(
           last.lastPrompt,
@@ -363,7 +361,7 @@ export function createGeminiDiagramServer(
           content.push({
             type: "image",
             data: result.imageData.toString("base64"),
-            mimeType: "image/png",
+            mimeType: result.mimeType ?? "image/png",
           });
         }
 

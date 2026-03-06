@@ -11,7 +11,7 @@ MCP server for generating diagrams, charts, and visualizations using Google Gemi
 - **Universal**: Works with Claude Code, Claude Desktop, Cursor, Windsurf, Cline, and any MCP client
 - **Professional Styling**: Consistent SaaS aesthetic with proper typography and color palette
 - **Configurable**: Aspect ratios (16:9, 1:1, 4:3, etc.) and resolutions (1K, 2K, 4K)
-- **Robust**: Retry logic with exponential backoff, PNG validation
+- **Robust**: Retry logic with exponential backoff, generated image validation
 - **Iterative**: Refine last generated image without repeating full prompt
 
 ## Tools
@@ -325,7 +325,7 @@ src/
 3. **Prompt Enhancement**: Wraps prompt with professional styling instructions
 4. **Image Generation**: Uses `gemini-3-pro-image-preview` via `@google/genai` SDK
 5. **Retry Logic**: 3 attempts with exponential backoff (1s → 2s → 4s)
-6. **PNG Validation**: Verifies magic bytes before saving
+6. **Image Validation**: Verifies generated image bytes and saves with the correct file extension
 7. **Session Tracking**: In-memory per MCP connection/session (suitable for centralized servers)
 
 ## Contributing

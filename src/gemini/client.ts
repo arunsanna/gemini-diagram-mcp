@@ -48,13 +48,72 @@ async function withRetry<T>(
   throw lastError;
 }
 
-/**
- * Validate PNG image data
- */
-function isValidPng(data: Buffer): boolean {
-  // PNG magic bytes: 89 50 4E 47 0D 0A 1A 0A
-  const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
-  return data.length > 8 && data.subarray(0, 8).equals(PNG_SIGNATURE);
+const PNG_SIGNATURE = Buffer.from([
+  0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
+]);
+const JPEG_SIGNATURE = Buffer.from([0xFF, 0xD8, 0xFF]);
+const GIF87A_SIGNATURE = Buffer.from("GIF87a", "ascii");
+const GIF89A_SIGNATURE = Buffer.from("GIF89a", "ascii");
+const RIFF_SIGNATURE = Buffer.from("RIFF", "ascii");
+const WEBP_SIGNATURE = Buffer.from("WEBP", "ascii");
+
+type ImageFormat = {
+  mimeType: string;
+  extension: string;
+};
+
+const IMAGE_FORMATS: ImageFormat[] = [
+  { mimeType: "image/png", extension: ".png" },
+  { mimeType: "image/jpeg", extension: ".jpg" },
+  { mimeType: "image/webp", extension: ".webp" },
+  { mimeType: "image/gif", extension: ".gif" },
+];
+
+function normalizeMimeType(mimeType: string | undefined): string | undefined {
+  return mimeType?.split(";")[0]?.trim().toLowerCase();
+}
+
+function detectImageFormat(data: Buffer): ImageFormat | null {
+  if (data.length >= PNG_SIGNATURE.length && data.subarray(0, 8).equals(PNG_SIGNATURE)) {
+    return IMAGE_FORMATS[0];
+  }
+
+  if (data.length >= JPEG_SIGNATURE.length && data.subarray(0, 3).equals(JPEG_SIGNATURE)) {
+    return IMAGE_FORMATS[1];
+  }
+
+  if (
+    data.length >= 12 &&
+    data.subarray(0, 4).equals(RIFF_SIGNATURE) &&
+    data.subarray(8, 12).equals(WEBP_SIGNATURE)
+  ) {
+    return IMAGE_FORMATS[2];
+  }
+
+  if (
+    data.length >= GIF87A_SIGNATURE.length &&
+    (data.subarray(0, 6).equals(GIF87A_SIGNATURE) ||
+      data.subarray(0, 6).equals(GIF89A_SIGNATURE))
+  ) {
+    return IMAGE_FORMATS[3];
+  }
+
+  return null;
+}
+
+function formatFromMimeType(mimeType: string | undefined): ImageFormat | null {
+  const normalized = normalizeMimeType(mimeType);
+  return IMAGE_FORMATS.find((format) => format.mimeType === normalized) ?? null;
+}
+
+function resolveOutputPathForFormat(outputPath: string, format: ImageFormat): string {
+  const parsed = path.parse(outputPath);
+
+  if (parsed.ext.toLowerCase() === format.extension) {
+    return outputPath;
+  }
+
+  return path.join(parsed.dir, `${parsed.name || parsed.base}${format.extension}`);
 }
 
 // Generation options
@@ -72,6 +131,7 @@ export interface GenerationResult {
   textResponse?: string;
   aspectRatio?: string;
   imageData?: Buffer;
+  mimeType?: string;
 }
 
 // ============================================================================
@@ -487,12 +547,14 @@ export class GeminiImageClient {
 
       // Process response - extract image and text from parts
       let imageData: Buffer | null = null;
+      let imageMimeType: string | undefined;
       let textResponse = "";
 
       const parts = response.candidates?.[0]?.content?.parts || [];
       for (const part of parts) {
         if ("inlineData" in part && part.inlineData?.data) {
           imageData = Buffer.from(part.inlineData.data, "base64");
+          imageMimeType = normalizeMimeType(part.inlineData.mimeType);
         } else if ("text" in part && part.text) {
           textResponse += part.text;
         }
@@ -506,23 +568,33 @@ export class GeminiImageClient {
         };
       }
 
-      // Validate PNG format
-      if (!isValidPng(imageData)) {
+      const detectedFormat = detectImageFormat(imageData);
+      if (!detectedFormat) {
         return {
           success: false,
-          error: "Generated data is not a valid PNG image",
+          error:
+            "Generated data is not a supported image format" +
+            (imageMimeType ? ` (${imageMimeType})` : ""),
         };
       }
 
-      // Save the image
-      fs.writeFileSync(outputPath, imageData);
+      const declaredFormat = formatFromMimeType(imageMimeType);
+      const finalFormat =
+        declaredFormat?.mimeType === detectedFormat.mimeType
+          ? declaredFormat
+          : detectedFormat;
+      const finalOutputPath = resolveOutputPathForFormat(outputPath, finalFormat);
+
+      // Prefer the actual bytes over the declared MIME type if they disagree.
+      fs.writeFileSync(finalOutputPath, imageData);
 
       return {
         success: true,
-        outputPath: path.resolve(outputPath),
+        outputPath: path.resolve(finalOutputPath),
         textResponse: textResponse || undefined,
         aspectRatio: aspectRatio,
         imageData,
+        mimeType: detectedFormat.mimeType,
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);

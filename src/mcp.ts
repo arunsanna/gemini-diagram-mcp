@@ -243,6 +243,9 @@ export function createGeminiDiagramServer(
         const finalSize = analysis.recommendedSize;
 
         const client = getClient();
+        // Track whether the output file existed before generation so we don't
+        // accidentally delete a prior valid file on dimension rejection.
+        const fileExistedBefore = fs.existsSync(outputPath);
         const result = await client.generate(prompt, outputPath, {
           type: finalType,
           aspectRatio: finalAspectRatio,
@@ -266,6 +269,10 @@ export function createGeminiDiagramServer(
           const dimInfo = result.actualWidth && result.actualHeight
             ? `${result.actualWidth}x${result.actualHeight}px`
             : "unknown";
+          // Only delete if this call created the file (don't destroy prior valid files)
+          if (result.outputPath && !fileExistedBefore) {
+            try { fs.unlinkSync(result.outputPath); } catch { /* ignore */ }
+          }
           return {
             content: [
               {
@@ -273,8 +280,7 @@ export function createGeminiDiagramServer(
                 text: `IMAGE REJECTED — dimensions do not match request.\n` +
                   `Requested: ${finalSize} at ${finalAspectRatio} | Received: ${dimInfo}\n` +
                   `${result.dimensionWarning}\n\n` +
-                  `ACTION REQUIRED: Retry with a simpler prompt, or adjust size/aspect_ratio parameters to match what the API can deliver. ` +
-                  `The file was saved at ${result.outputPath} but does not meet the requested specifications.`,
+                  `ACTION REQUIRED: Retry with a simpler prompt, or adjust size/aspect_ratio parameters to match what the API can deliver.`,
               },
             ],
             isError: true,

@@ -4,7 +4,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { CallToolResultSchema } from "@modelcontextprotocol/sdk/types.js";
 
-import { GenerateImageSchema, RefineImageSchema } from "./mcp.js";
+import { GenerateImageSchema, RefineImageSchema, PrepareImageSchema } from "./mcp.js";
 import { getPackageVersion } from "./runtime.js";
 
 function normalizeCallToolResult(result: any): any {
@@ -94,6 +94,27 @@ export async function startProxyServer(): Promise<void> {
       try {
         const result = await client.callTool({
           name: "refine_image",
+          arguments: args,
+        }, CallToolResultSchema);
+        return normalizeCallToolResult(result);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        return {
+          content: [{ type: "text" as const, text: `Proxy error: ${message}` }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.tool(
+    "prepare_image",
+    "Proxy to remote gemini-diagram MCP server (prepare_image)",
+    PrepareImageSchema.shape,
+    async (args) => {
+      try {
+        const result = await client.callTool({
+          name: "prepare_image",
           arguments: args,
         }, CallToolResultSchema);
         return normalizeCallToolResult(result);

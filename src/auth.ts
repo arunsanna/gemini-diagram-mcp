@@ -1,4 +1,4 @@
-import { timingSafeEqual } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
 import { createRemoteJWKSet, jwtVerify, type JWTPayload } from "jose";
 
 export type McpAuthMode = "token" | "oidc" | "none";
@@ -57,18 +57,18 @@ export function createTokenAuthVerifierFromEnv(): {
     );
   }
 
+  // Pre-hash all valid tokens for constant-time comparison
+  const tokenHashes = tokens.map((t) => createHash("sha256").update(t).digest());
+
   return {
     mode: "token",
     allowQueryToken,
     async verifyRequest(req: any): Promise<AuthResult> {
       const token = extractBearerToken(req, { allowQueryToken });
       if (!token) return { ok: false, status: 401, error: "Unauthorized" };
-      const tokenBuf = Buffer.from(token);
-      const matched = tokens.some((t) => {
-        const expectedBuf = Buffer.from(t);
-        if (tokenBuf.length !== expectedBuf.length) return false;
-        return timingSafeEqual(tokenBuf, expectedBuf);
-      });
+      // Hash to fixed-length digest so timingSafeEqual never leaks token length
+      const tokenHash = createHash("sha256").update(token).digest();
+      const matched = tokenHashes.some((h) => timingSafeEqual(tokenHash, h));
       if (!matched) {
         return { ok: false, status: 401, error: "Unauthorized" };
       }

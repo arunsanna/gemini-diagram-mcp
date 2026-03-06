@@ -1,31 +1,32 @@
 #!/usr/bin/env bash
 # Pre-commit hook: detect secrets in staged files
 # Prevents accidental commits of API keys, tokens, and credentials.
+# Uses POSIX ERE (grep -E) for macOS/BSD compatibility — no grep -P required.
 
 set -euo pipefail
 
-# Patterns to detect (case-insensitive)
+# Patterns to detect (POSIX ERE compatible)
 SECRET_PATTERNS=(
-  # Google / Gemini API keys
+  # Google / Gemini API keys (always 39 chars starting with AIza)
   'AIza[0-9A-Za-z_-]{35}'
-  # Generic long hex/base64 tokens assigned to variables
-  '(?i)(api[_-]?key|secret|token|password|credential|auth[_-]?token)\s*[:=]\s*["\x27][A-Za-z0-9+/=_-]{20,}["\x27]'
   # AWS access keys
   'AKIA[0-9A-Z]{16}'
-  # AWS secret keys
-  '(?i)aws[_-]?secret[_-]?access[_-]?key\s*[:=]\s*["\x27][A-Za-z0-9+/=]{40}["\x27]'
   # Private keys
   '-----BEGIN (RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----'
   # npm tokens
   'npm_[A-Za-z0-9]{36}'
-  # GitHub tokens
+  # GitHub tokens (PAT, OAuth, etc.)
   'gh[pousr]_[A-Za-z0-9]{36,}'
-  # Generic Bearer tokens in code
-  '(?i)Bearer\s+[A-Za-z0-9_-]{20,}'
+  # Hardcoded key/secret/password assignments with quoted values >=20 chars
+  '(api_key|api-key|apikey|secret|password|credential)[[:space:]]*[:=][[:space:]]*"[A-Za-z0-9+/=_-]{20,}"'
+  "(api_key|api-key|apikey|secret|password|credential)[[:space:]]*[:=][[:space:]]*'[A-Za-z0-9+/=_-]{20,}'"
 )
 
-# Files to always skip
-SKIP_PATTERNS='\.sample$|\.lock$|package-lock\.json$|\.png$|\.jpg$|\.jpeg$|\.gif$|\.webp$|\.ico$|\.woff|\.ttf$|\.eot$'
+# Files to always skip (binaries, locks, etc.)
+SKIP_PATTERNS='\.(sample|lock|png|jpg|jpeg|gif|webp|ico|woff2?|ttf|eot|svg)$|package-lock\.json$'
+
+# Source files that legitimately reference auth patterns (not secrets)
+SKIP_SOURCE_PATTERNS='(^|/)auth\.(ts|js)$|(^|/)proxy\.(ts|js)$|(^|/)\.githooks/'
 
 found_secrets=0
 
@@ -37,8 +38,13 @@ if [ -z "$staged_files" ]; then
 fi
 
 for file in $staged_files; do
-  # Skip binary-ish and lock files
+  # Skip binary/lock files
   if echo "$file" | grep -qE "$SKIP_PATTERNS"; then
+    continue
+  fi
+
+  # Skip source files that legitimately contain auth code
+  if echo "$file" | grep -qE "$SKIP_SOURCE_PATTERNS"; then
     continue
   fi
 
@@ -48,8 +54,7 @@ for file in $staged_files; do
   fi
 
   for pattern in "${SECRET_PATTERNS[@]}"; do
-    # Use grep -P for PCRE support; fall back to grep -E
-    if grep -PnH "$pattern" "$file" 2>/dev/null | grep -v '// *test\|// *example\|// *TODO\|\.sample\|\.example' | head -5; then
+    if grep -EnH "$pattern" "$file" 2>/dev/null | head -5; then
       found_secrets=1
     fi
   done

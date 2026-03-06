@@ -243,6 +243,9 @@ export function createGeminiDiagramServer(
         const finalSize = analysis.recommendedSize;
 
         const client = getClient();
+        // Track whether the output file existed before generation so we don't
+        // accidentally delete a prior valid file on dimension rejection.
+        const fileExistedBefore = fs.existsSync(outputPath);
         const result = await client.generate(prompt, outputPath, {
           type: finalType,
           aspectRatio: finalAspectRatio,
@@ -266,8 +269,8 @@ export function createGeminiDiagramServer(
           const dimInfo = result.actualWidth && result.actualHeight
             ? `${result.actualWidth}x${result.actualHeight}px`
             : "unknown";
-          // Clean up the non-compliant file to avoid orphaned rejects
-          if (result.outputPath) {
+          // Only delete if this call created the file (don't destroy prior valid files)
+          if (result.outputPath && !fileExistedBefore) {
             try { fs.unlinkSync(result.outputPath); } catch { /* ignore */ }
           }
           return {

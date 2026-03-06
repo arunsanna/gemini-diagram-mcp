@@ -107,8 +107,8 @@ export async function startHttpServer(): Promise<void> {
     Object.create(null);
   const sessionLastActive: Record<string, number> = Object.create(null);
 
-  const SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
-  const MAX_SESSIONS = 100;
+  const SESSION_TIMEOUT_MS = parsePort(process.env.MCP_SESSION_TIMEOUT_MIN, 30) * 60 * 1000;
+  const MAX_SESSIONS = parsePort(process.env.MCP_MAX_SESSIONS, 100);
 
   // Periodic cleanup of stale sessions
   const cleanupInterval = setInterval(() => {

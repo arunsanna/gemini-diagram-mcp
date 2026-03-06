@@ -115,7 +115,7 @@ export async function startHttpServer(): Promise<void> {
     const now = Date.now();
     for (const sid of Object.keys(sessionLastActive)) {
       if (now - sessionLastActive[sid] > SESSION_TIMEOUT_MS) {
-        try { transports[sid]?.close(); } catch { /* ignore */ }
+        void Promise.resolve(transports[sid]?.close()).catch(() => {/* ignore */});
         delete transports[sid];
         delete sessionLastActive[sid];
       }
@@ -209,6 +209,14 @@ export async function startHttpServer(): Promise<void> {
   // Legacy SSE transport (for older clients)
   app.get("/sse", async (req: any, res: any) => {
     try {
+      // Enforce max sessions (same limit as Streamable HTTP)
+      if (Object.keys(transports).length >= MAX_SESSIONS) {
+        if (!res.headersSent) {
+          res.status(503).json({ error: "Too many active sessions. Try again later." });
+        }
+        return;
+      }
+
       const transport = new SSEServerTransport("/messages", res);
       transports[transport.sessionId] = transport;
       sessionLastActive[transport.sessionId] = Date.now();

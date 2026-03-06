@@ -172,7 +172,7 @@ export const DIAGRAM_TYPES: Record<
     composition: "Grid layout, 2x2 or larger, quadrants with labels",
   },
   hero: {
-    aspectRatio: "2:1",
+    aspectRatio: "16:9",
     composition: "Abstract visual, no text, atmospheric, brand-focused",
   },
   visualization: {
@@ -411,7 +411,7 @@ export function analyzePrompt(prompt: string, options: GenerateOptions = {}): Pr
   if (lower.includes("square")) {
     recommendedAspectRatio = "1:1";
   } else if (lower.includes("wide") || lower.includes("banner") || lower.includes("header")) {
-    recommendedAspectRatio = "2:1";
+    recommendedAspectRatio = "16:9";
   } else if (lower.includes("portrait") || lower.includes("mobile") || lower.includes("story")) {
     recommendedAspectRatio = "9:16";
   }

@@ -40,7 +40,7 @@ export const GenerateImageSchema = z.object({
     .default("auto")
     .describe("Type of image to generate (auto-detected if not specified)"),
   aspect_ratio: z
-    .enum(["16:9", "1:1", "4:3", "3:4", "9:16", "2:1"])
+    .enum(["16:9", "1:1", "4:3", "3:4", "9:16", "3:2", "2:3", "21:9"])
     .optional()
     .describe(
       "Image aspect ratio (auto-selected based on type if not specified)"

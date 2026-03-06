@@ -461,14 +461,14 @@ export function createGeminiDiagramServer(
         "",
         "ARCHITECTURE & FLOW DIAGRAM TIPS:",
         "  - Name specific technologies (e.g., 'PostgreSQL', 'Redis', 'Kubernetes') so the",
-        "    model renders recognizable icons instead of plain boxes",
+        "    model can apply appropriate shape hints (cylinders, pipes, nested boxes, etc.)",
         "  - Describe containment relationships (e.g., 'containers running inside a K8s pod')",
         "  - Specify connection types: sync/async, protocol (REST, gRPC, pub/sub)",
         "  - Mention data stores separately from compute — they render as different shapes",
         "  - Group components by layer (ingress, application, data, external)",
-        "  - The model auto-detects technologies and uses: cylinders for databases,",
-        "    cloud shapes for cloud services, nested boxes for containers, pipes for queues,",
-        "    diamonds for load balancers, and brand icons for named technologies",
+        "  - Shape vocabulary is auto-injected for architecture/flow types:",
+        "    cylinders for databases, pipes for queues, nested boxes for containers,",
+        "    diamonds for load balancers, cloud silhouettes for cloud services",
       ];
 
       if (prompt) {

@@ -172,11 +172,14 @@ function resolveOutputPathForFormat(outputPath: string, format: ImageFormat): st
   return path.join(parsed.dir, `${parsed.name || parsed.base}${format.extension}`);
 }
 
+export type StyleMode = "professional" | "creative";
+
 // Generation options
 export interface GenerateOptions {
   type?: string;
   aspectRatio?: string;
   size?: string;
+  style?: StyleMode;
 }
 
 // Result from image generation
@@ -339,14 +342,32 @@ const TYPE_KEYWORDS: Record<string, string[]> = {
 // SYSTEM PROMPT - Consistent styling for all generated images
 // ============================================================================
 
-const SYSTEM_PROMPT = `RENDERING QUALITY:
+// Base rules applied to ALL styles (sharpness + watermark)
+const BASE_PROMPT_PROFESSIONAL = `RENDERING QUALITY:
 - Ultra-sharp edges on all text, lines, icons, and shapes — no blur or anti-aliasing artifacts
 - Crisp 1px borders where borders are used; never fuzzy or semi-transparent
 - All text must be pixel-perfect, fully legible, and never truncated or overlapping
 - High-contrast rendering: foreground elements must stand out clearly from backgrounds
 - Vector-quality appearance: clean geometry, precise alignment, no rasterization noise
 
-BACKGROUND REQUIREMENTS:
+WATERMARK — THIS IS REQUIRED, DO NOT SKIP:
+- You MUST render the text "arunsanna.com" in the bottom-right corner of the image
+- Use light gray color (#94a3b8), small font size (about 10pt), slightly transparent
+- Position it with a small margin from the bottom and right edges
+- This watermark must appear on EVERY generated image without exception`;
+
+const BASE_PROMPT_CREATIVE = `RENDERING QUALITY:
+- All text must be legible and never truncated or overlapping
+- Clean geometry and precise alignment appropriate to the chosen artistic style
+
+WATERMARK — THIS IS REQUIRED, DO NOT SKIP:
+- You MUST render the text "arunsanna.com" in the bottom-right corner of the image
+- Use a subtle color that contrasts with the background (light on dark, dark on light), small font size (about 10pt), slightly transparent
+- Position it with a small margin from the bottom and right edges
+- This watermark must appear on EVERY generated image without exception`;
+
+// Professional aesthetic — only applied when style === "professional"
+const PROFESSIONAL_STYLE_PROMPT = `BACKGROUND REQUIREMENTS:
 - Primary background: Clean white (#ffffff) or very light gray (#f8fafc)
 - Secondary backgrounds: Light gray (#f1f5f9) for cards/containers
 - NO dark backgrounds - images must work on white web pages
@@ -379,13 +400,14 @@ STYLE:
 - Consistent 8px or 16px spacing
 - Rounded corners (8-12px radius)
 - Professional enterprise look
-- Works seamlessly on white web pages
+- Works seamlessly on white web pages`;
 
-WATERMARK — THIS IS REQUIRED, DO NOT SKIP:
-- You MUST render the text "arunlab.com" in the bottom-right corner of the image
-- Use light gray color (#94a3b8), small font size (about 10pt), slightly transparent
-- Position it with a small margin from the bottom and right edges
-- This watermark must appear on EVERY generated image without exception`;
+function getStylePrompt(style?: StyleMode): string {
+  if (style === "creative") {
+    return BASE_PROMPT_CREATIVE;
+  }
+  return `${PROFESSIONAL_STYLE_PROMPT}\n\n${BASE_PROMPT_PROFESSIONAL}`;
+}
 
 // Detection result with confidence
 export interface TypeDetection {
@@ -627,7 +649,7 @@ const SIZE_MAP: Record<string, string> = {
  */
 export function buildPromptFromContext(
   context: string,
-  options: { type?: string; aspectRatio?: string; size?: string } = {}
+  options: { type?: string; aspectRatio?: string; size?: string; style?: StyleMode } = {}
 ): { prompt: string; aspectRatio: string; diagramType: string } {
   const diagramType = options.type || detectType(context);
   const typeConfig = DIAGRAM_TYPES[diagramType] || DIAGRAM_TYPES.chart;
@@ -645,7 +667,22 @@ export function buildPromptFromContext(
     technicalBlock = `${TECHNICAL_DIAGRAM_PROMPT}${hintsSection}`;
   }
 
-  const prompt = `Create a professional ${diagramType} diagram.
+  const stylePrompt = getStylePrompt(options.style);
+  const styleLabel = options.style === "creative" ? "" : " professional";
+
+  const importantLines = [
+    "- Make the visualization clear and immediately understandable",
+    `- Maintain the specified ${aspectRatio} aspect ratio precisely`,
+    '- MANDATORY: Include "arunsanna.com" watermark text in the bottom-right corner (light gray, small, subtle)',
+  ];
+  if (options.style !== "creative") {
+    importantLines.unshift(
+      "- Follow the design system exactly (white background, SaaS aesthetic)",
+      "- Use the standard color palette for data representation",
+    );
+  }
+
+  const prompt = `Create a${styleLabel} ${diagramType} diagram.
 
 CONTEXT:
 ${context}
@@ -658,14 +695,10 @@ IMAGE SPECIFICATIONS:
 - Resolution: High quality, ${sizeDesc}
 - Format: PNG with clean edges
 
-${SYSTEM_PROMPT}
+${stylePrompt}
 
 IMPORTANT:
-- Follow the design system exactly (white background, SaaS aesthetic)
-- Make the visualization clear and immediately understandable
-- Use the standard color palette for data representation
-- Maintain the specified ${aspectRatio} aspect ratio precisely
-- MANDATORY: Include "arunlab.com" watermark text in the bottom-right corner (light gray, small, subtle)`;
+${importantLines.join("\n")}`;
 
   return { prompt, aspectRatio, diagramType };
 }
@@ -716,6 +749,7 @@ export class GeminiImageClient {
           type: options.type === "auto" ? undefined : options.type,
           aspectRatio: options.aspectRatio,
           size: options.size,
+          style: options.style,
         });
 
       // Resolve size to valid imageSize value
@@ -724,7 +758,7 @@ export class GeminiImageClient {
       // Generate with retry logic
       const response = await withRetry(async () => {
         return this.ai.models.generateContent({
-          model: "gemini-3-pro-image-preview",
+          model: this.model,
           contents: enhancedPrompt,
           config: {
             responseModalities: ["TEXT", "IMAGE"],

@@ -18,6 +18,7 @@ import {
   DIAGRAM_TYPES,
   ASPECT_RATIO_VALUES,
   buildPromptFromContext,
+  type StyleMode,
 } from "./gemini/client.js";
 
 export const GenerateImageSchema = z.object({
@@ -55,6 +56,13 @@ export const GenerateImageSchema = z.object({
     .enum(["1K", "2K", "4K"])
     .default("2K")
     .describe("Image resolution (1K, 2K, or 4K)"),
+  style: z
+    .enum(["professional", "creative"])
+    .default("professional")
+    .describe(
+      "Style mode. 'professional' enforces clean SaaS aesthetic (white bg, standard palette). " +
+      "'creative' removes aesthetic constraints so the prompt drives the look (vintage, retro, dark, artistic, etc.)"
+    ),
 });
 
 export const RefineImageSchema = z.object({
@@ -108,6 +116,7 @@ type LastImageSession = {
   lastType: string;
   aspectRatio?: string;
   size?: string;
+  style?: StyleMode;
 };
 
 function normalizeBaseUrl(baseUrl: string): string {
@@ -214,7 +223,7 @@ export function createGeminiDiagramServer(
     "generate_image",
     "Generate a diagram, chart, or visualization using Gemini. Intelligently detects type from prompt and asks clarifying questions when uncertain. Supports: chart, comparison, flow, architecture, timeline, hierarchy, matrix, hero, visualization.",
     GenerateImageSchema.shape,
-    async ({ prompt, output, type, aspect_ratio, size }) => {
+    async ({ prompt, output, type, aspect_ratio, size, style }) => {
       try {
         const analysis = analyzePrompt(prompt, {
           type: type === "auto" ? undefined : type,
@@ -250,6 +259,7 @@ export function createGeminiDiagramServer(
           type: finalType,
           aspectRatio: finalAspectRatio,
           size: finalSize,
+          style,
         });
 
         if (!result.success) {
@@ -287,32 +297,59 @@ export function createGeminiDiagramServer(
           };
         }
 
+        const activeStyle: StyleMode = style || "professional";
+
         last = {
           lastPrompt: prompt,
           lastOutputPath: result.outputPath!,
           lastType: finalType,
           aspectRatio: result.aspectRatio,
           size: finalSize,
+          style: activeStyle,
         };
 
         const dimStr = result.actualWidth && result.actualHeight
           ? ` [${result.actualWidth}x${result.actualHeight}px]`
           : "";
         const lines: string[] = [
-          `Generated ${finalType} (${result.aspectRatio}, ${finalSize})${dimStr}`,
+          `Generated ${finalType} (${result.aspectRatio}, ${finalSize}, style: ${activeStyle})${dimStr}`,
           `Saved: ${result.outputPath}`,
         ];
 
         const resultFilename = path.basename(result.outputPath!);
         if (publicBaseUrl && isPathInsideRoot(outputDir, result.outputPath!)) {
           lines.push(`Download: ${publicBaseUrl}/files/${encodeURIComponent(resultFilename)}`);
-          lines.push("Note: download requires MCP_AUTH_TOKEN (Authorization header or ?token=...).");
+          const authMode = process.env.MCP_AUTH_MODE ?? "token";
+          if (authMode === "token") {
+            lines.push(
+              "Note: download requires MCP_AUTH_TOKEN (Authorization header or ?token=...)."
+            );
+          } else if (authMode === "oidc") {
+            lines.push("Note: download requires an OIDC bearer token.");
+          }
         }
 
         if (analysis.suggestions && analysis.suggestions.length > 0) {
           lines.push(
             `Note: ${analysis.suggestions.join(". ")}. Use 'type' parameter to override.`
           );
+        }
+
+        // Hint about creative mode when prompt suggests non-professional styling
+        if (activeStyle === "professional") {
+          const lowerPrompt = prompt.toLowerCase();
+          const creativeKeywords = [
+            "vintage", "retro", "hand-drawn", "sketch", "watercolor",
+            "artistic", "dark theme", "dark mode", "neon", "grunge",
+            "minimalist art", "pastel", "sepia", "old-fashioned",
+            "rustic", "elegant", "gothic", "comic", "cartoon",
+          ];
+          if (creativeKeywords.some((kw) => lowerPrompt.includes(kw))) {
+            lines.push(
+              `Tip: Your prompt mentions a creative style. For best results with non-standard aesthetics, ` +
+              `set style: "creative" to remove the professional SaaS constraints (white bg, fixed palette, sans-serif fonts).`
+            );
+          }
         }
 
         const content: Array<
@@ -377,6 +414,7 @@ export function createGeminiDiagramServer(
             type: last.lastType,
             aspectRatio: last.aspectRatio,
             size: last.size,
+            style: last.style,
           }
         );
 
@@ -444,6 +482,11 @@ export function createGeminiDiagramServer(
         `SUPPORTED ASPECT RATIOS: ${supportedRatios}`,
         "  Tip: Let the type auto-select the ratio, or override with aspect_ratio parameter.",
         "",
+        "STYLE MODES:",
+        "  - professional (default): Enforces clean SaaS aesthetic — white background, standard palette, sans-serif fonts",
+        "  - creative: Removes aesthetic constraints — your prompt drives the look (vintage, retro, dark, artistic, watercolor, etc.)",
+        "  Tip: Use 'creative' when you want non-standard visuals like vintage posters, hand-drawn sketches, or dark themes.",
+        "",
         "SUPPORTED SIZES: 1K, 2K (default), 4K",
         "  - 1K: ~1024px longest side (fast, lightweight)",
         "  - 2K: ~2048px longest side (good balance)",
@@ -459,8 +502,9 @@ export function createGeminiDiagramServer(
         "  - Keep prompts focused — overly complex prompts may cause dimension/quality issues",
         "",
         "WHAT TO AVOID:",
-        "  - Do NOT specify colors, fonts, or visual styling (the system prompt handles this)",
-        "  - Do NOT request dark backgrounds (white/light backgrounds are enforced)",
+        "  - In 'professional' mode: Do NOT specify colors, fonts, or visual styling (the system prompt handles this)",
+        "  - In 'professional' mode: Do NOT request dark backgrounds (white/light backgrounds are enforced)",
+        "  - In 'creative' mode: You CAN specify any styling — colors, fonts, backgrounds, artistic effects",
         "  - Do NOT use aspect ratio 2:1 (use 16:9 instead)",
         "  - Do NOT request extremely complex layouts in a single image",
         "  - Do NOT include instructions like 'make it pretty' — focus on content",
@@ -505,6 +549,20 @@ export function createGeminiDiagramServer(
           sections.push("", "CLARIFICATION NEEDED:", analysis.clarifyingQuestion);
         }
 
+        // Detect if prompt suggests creative style
+        const lowerForStyle = prompt.toLowerCase();
+        const creativeHints = [
+          "vintage", "retro", "hand-drawn", "sketch", "watercolor",
+          "artistic", "dark theme", "dark mode", "neon", "grunge",
+          "minimalist art", "pastel", "sepia", "old-fashioned",
+          "rustic", "elegant", "gothic", "comic", "cartoon",
+          "antique", "distressed", "steampunk", "cyberpunk", "noir",
+          "impressionist", "abstract art",
+        ];
+        const recommendedStyle = creativeHints.some((kw) => lowerForStyle.includes(kw))
+          ? "creative"
+          : "professional";
+
         sections.push(
           "",
           "=== RECOMMENDED CALL ===",
@@ -513,7 +571,16 @@ export function createGeminiDiagramServer(
           `  type: "${diagramType}"`,
           `  aspect_ratio: "${aspectRatio}"`,
           `  size: "${analysis.recommendedSize}"`,
+          `  style: "${recommendedStyle}"`,
         );
+
+        if (recommendedStyle === "creative") {
+          sections.push(
+            "",
+            "Note: Creative style detected — aesthetic constraints (white bg, SaaS palette) will be removed.",
+            "Your prompt will drive the visual style directly.",
+          );
+        }
       }
 
       return {

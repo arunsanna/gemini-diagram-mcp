@@ -2,10 +2,15 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import * as path from "node:path";
 
 import { createGeminiDiagramServer } from "./mcp.js";
-import { assertApiKeyPresent, getPackageVersion } from "./runtime.js";
+import {
+  assertVertexConfigPresent,
+  enforceVertexAiMode,
+  getPackageVersion,
+} from "./runtime.js";
 
 export async function startStdioServer(): Promise<void> {
-  assertApiKeyPresent();
+  enforceVertexAiMode();
+  assertVertexConfigPresent();
 
   const outputDir = process.cwd();
   const server = createGeminiDiagramServer({
@@ -25,4 +30,3 @@ export async function startStdioServer(): Promise<void> {
     `Gemini Diagram MCP server running on stdio (output: ${path.resolve(outputDir)})`
   );
 }
-

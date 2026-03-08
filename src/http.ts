@@ -14,7 +14,11 @@ import {
   createTokenAuthVerifierFromEnv,
   parseAuthMode,
 } from "./auth.js";
-import { assertApiKeyPresent, getPackageVersion } from "./runtime.js";
+import {
+  assertVertexConfigPresent,
+  enforceVertexAiMode,
+  getPackageVersion,
+} from "./runtime.js";
 
 function parsePort(value: string | undefined, fallback: number): number {
   if (!value) return fallback;
@@ -28,7 +32,8 @@ function normalizeBaseUrl(url: string): string {
 }
 
 export async function startHttpServer(): Promise<void> {
-  assertApiKeyPresent();
+  enforceVertexAiMode();
+  assertVertexConfigPresent();
   const authMode = parseAuthMode(process.env.MCP_AUTH_MODE);
   const authVerifier =
     authMode === "oidc"

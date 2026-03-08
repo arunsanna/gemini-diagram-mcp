@@ -19,7 +19,11 @@ Usage:
   gemini-diagram-mcp proxy           Start stdio proxy that forwards to a remote HTTP MCP server
 
 Environment:
-  GEMINI_API_KEY or GOOGLE_API_KEY   Required for stdio/http server modes
+  VERTEX_AI_API_KEY                  Preferred Vertex AI API key for stdio/http server modes
+  GOOGLE_API_KEY                     Backward-compatible Vertex AI API key env var
+  GOOGLE_CLOUD_API_KEY               Alternate Vertex AI API key env var
+  GOOGLE_GENAI_USE_VERTEXAI          Forced to true by the server at runtime
+  VERTEX_AI_IMAGE_MODEL              Optional model override (default: gemini-3-pro-image-preview)
   MCP_AUTH_MODE                      Auth mode for HTTP server: token (default), oidc, none
   MCP_AUTH_TOKEN                     Auth for token mode (HTTP server) and legacy proxy env var
   MCP_AUTH_TOKENS                    Optional comma-separated tokens (replaces MCP_AUTH_TOKEN)

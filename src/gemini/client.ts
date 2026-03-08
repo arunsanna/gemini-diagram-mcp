@@ -8,6 +8,11 @@
 import { GoogleGenAI } from "@google/genai";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import {
+  enforceVertexAiMode,
+  getVertexApiKeyFromEnv,
+  getVertexImageModel,
+} from "../runtime.js";
 
 // ============================================================================
 // UTILITIES
@@ -671,18 +676,23 @@ IMPORTANT:
  */
 export class GeminiImageClient {
   private ai: GoogleGenAI;
+  private model: string;
 
   constructor(apiKey?: string) {
-    const key =
-      apiKey || process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+    const key = apiKey || getVertexApiKeyFromEnv();
 
     if (!key) {
       throw new Error(
-        "GEMINI_API_KEY or GOOGLE_API_KEY environment variable required"
+        "VERTEX_AI_API_KEY, GOOGLE_API_KEY, or GOOGLE_CLOUD_API_KEY environment variable required for Vertex AI API-key mode"
       );
     }
 
-    this.ai = new GoogleGenAI({ apiKey: key });
+    enforceVertexAiMode();
+    this.model = getVertexImageModel();
+    this.ai = new GoogleGenAI({
+      vertexai: true,
+      apiKey: key,
+    });
   }
 
   /**

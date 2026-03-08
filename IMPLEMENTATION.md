@@ -6,7 +6,7 @@ The existing `~/bin/gemini-image-gen` is a 2100+ line Python script with these k
 
 ### Core Capabilities
 - Uses `google-genai` Python SDK
-- Supports `GOOGLE_CLOUD_API_KEY` or `GOOGLE_API_KEY` env vars
+- Supports Vertex AI API-key mode (`VERTEX_AI_API_KEY`, `GOOGLE_CLOUD_API_KEY`, or `GOOGLE_API_KEY`)
 - Session management for multi-turn refinement
 - Presets for common diagram types
 - Batch processing via YAML config
@@ -35,12 +35,12 @@ async function generateImage(prompt: string, output: string) {
 **Pros**: Reuse battle-tested code, minimal rewrite
 **Cons**: Requires Python installed, subprocess overhead
 
-### Option B: Native TypeScript with @google/generative-ai
+### Option B: Native TypeScript with @google/genai
 ```typescript
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenAI } from '@google/genai';
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-// Use imagen or gemini-pro-vision for generation
+const genAI = new GoogleGenAI({ vertexai: true, apiKey: process.env.VERTEX_AI_API_KEY });
+// Use gemini-3-pro-image-preview for Nano Banana Pro image generation
 ```
 **Pros**: Pure Node.js, no Python dependency
 **Cons**: May need to reimplement features, API differences

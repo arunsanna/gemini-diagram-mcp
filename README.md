@@ -3,7 +3,7 @@
 [![npm version](https://badge.fury.io/js/gemini-diagram-mcp.svg)](https://www.npmjs.com/package/gemini-diagram-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-MCP server for generating diagrams, charts, and visualizations using Google Gemini's native image generation.
+MCP server for generating diagrams, charts, and visualizations using Gemini image generation on Vertex AI.
 
 ## Features
 
@@ -41,13 +41,13 @@ MCP server for generating diagrams, charts, and visualizations using Google Gemi
 
 ### 1. Get API Key
 
-Get a Gemini API key from [Google AI Studio](https://aistudio.google.com/apikey)
+Get a Vertex AI API key for the Vertex AI Express Mode flow. The server enforces `vertexai: true` and defaults to `gemini-3-pro-image-preview` (Nano Banana Pro class).
 
 ### 2. Choose How You Run It
 
 You can run this MCP in two ways:
 
-1. **Local stdio server (classic MCP)**: each client spawns `npx gemini-diagram-mcp` and you provide the Gemini API key to the client.
+1. **Local stdio server (classic MCP)**: each client spawns `npx gemini-diagram-mcp` and you provide the Vertex AI API key to the client.
 2. **Centralized HTTP server (recommended for teams)**: run one Docker container with the API key + auth (static token or OIDC), and have clients connect via a local proxy (no API key on clients).
 
 ## Centralized Deployment (Docker)
@@ -56,7 +56,10 @@ This runs one MCP server that all agents share.
 
 ### Requirements
 
-- `GOOGLE_API_KEY` or `GEMINI_API_KEY`
+- `VERTEX_AI_API_KEY` (preferred)
+- `GOOGLE_API_KEY` or `GOOGLE_CLOUD_API_KEY` (backward-compatible aliases)
+- `GOOGLE_GENAI_USE_VERTEXAI=true` is enforced by the server
+- `VERTEX_AI_IMAGE_MODEL=gemini-3-pro-image-preview` by default
 - Auth (choose one):
   - **Static token** (default): `MCP_AUTH_MODE=token` + `MCP_AUTH_TOKEN` (or `MCP_AUTH_TOKENS`)
   - **OIDC JWT** (recommended for multi-user): `MCP_AUTH_MODE=oidc` + `OIDC_ISSUER` (+ `OIDC_AUDIENCE` recommended)
@@ -65,7 +68,9 @@ This runs one MCP server that all agents share.
 ### Suggested `.env`
 
 ```bash
-GOOGLE_API_KEY=your-api-key
+VERTEX_AI_API_KEY=your-vertex-ai-api-key
+# GOOGLE_GENAI_USE_VERTEXAI=true
+# VERTEX_AI_IMAGE_MODEL=gemini-3-pro-image-preview
 # PUBLIC_BASE_URL=http://<server-ip>:3000
 
 # Auth (choose one)
@@ -82,7 +87,7 @@ MCP_AUTH_TOKEN=your-strong-token
 ### Run
 
 ```bash
-export GOOGLE_API_KEY="your-api-key"
+export VERTEX_AI_API_KEY="your-vertex-ai-api-key"
 export MCP_AUTH_MODE="token"
 export MCP_AUTH_TOKEN="your-strong-token"
 docker compose up --build
@@ -178,7 +183,7 @@ No build required - just use `npx`:
 #### Claude Code
 
 ```bash
-claude mcp add-json gemini-image '{"command":"npx","args":["gemini-diagram-mcp"],"env":{"GOOGLE_API_KEY":"your-api-key"}}'
+claude mcp add-json gemini-image '{"command":"npx","args":["gemini-diagram-mcp"],"env":{"VERTEX_AI_API_KEY":"your-vertex-ai-api-key"}}'
 ```
 
 Or manually edit `~/.claude.json`:
@@ -189,7 +194,7 @@ Or manually edit `~/.claude.json`:
       "command": "npx",
       "args": ["gemini-diagram-mcp"],
       "env": {
-        "GOOGLE_API_KEY": "your-api-key"
+        "VERTEX_AI_API_KEY": "your-vertex-ai-api-key"
       }
     }
   }
@@ -205,7 +210,7 @@ Add to Cursor settings (`Preferences > MCP Servers`):
     "command": "npx",
     "args": ["gemini-diagram-mcp"],
     "env": {
-      "GOOGLE_API_KEY": "your-api-key"
+      "VERTEX_AI_API_KEY": "your-vertex-ai-api-key"
     }
   }
 }
@@ -221,7 +226,7 @@ Add to `~/.windsurf/mcp.json`:
       "command": "npx",
       "args": ["gemini-diagram-mcp"],
       "env": {
-        "GOOGLE_API_KEY": "your-api-key"
+        "VERTEX_AI_API_KEY": "your-vertex-ai-api-key"
       }
     }
   }
@@ -241,7 +246,7 @@ Add to `claude_desktop_config.json`:
       "command": "npx",
       "args": ["gemini-diagram-mcp"],
       "env": {
-        "GOOGLE_API_KEY": "your-api-key"
+        "VERTEX_AI_API_KEY": "your-vertex-ai-api-key"
       }
     }
   }
@@ -257,7 +262,7 @@ Add to Cline MCP settings in VS Code:
     "command": "npx",
     "args": ["gemini-diagram-mcp"],
     "env": {
-      "GOOGLE_API_KEY": "your-api-key"
+      "VERTEX_AI_API_KEY": "your-vertex-ai-api-key"
     }
   }
 }
@@ -323,7 +328,7 @@ src/
 1. **Smart Analysis**: `analyzePrompt()` scores prompt against type keywords, returns confidence level
 2. **Clarifying Questions**: Low confidence → returns question instead of generating
 3. **Prompt Enhancement**: Wraps prompt with professional styling instructions
-4. **Image Generation**: Uses `gemini-3-pro-image-preview` via `@google/genai` SDK
+4. **Image Generation**: Uses Vertex AI mode with `gemini-3-pro-image-preview` via `@google/genai`
 5. **Retry Logic**: 3 attempts with exponential backoff (1s → 2s → 4s)
 6. **Image Validation**: Verifies generated image bytes and saves with the correct file extension
 7. **Session Tracking**: In-memory per MCP connection/session (suitable for centralized servers)

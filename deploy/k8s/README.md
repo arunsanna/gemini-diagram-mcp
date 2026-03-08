@@ -23,10 +23,11 @@ docker push <registry>/gemini-diagram-mcp:<tag>
 
 - `deploy/k8s/base`: Deployment + Service (static token auth by default).
 - `deploy/k8s/overlays/oidc`: Patches base to use OIDC JWT auth + adds an example Ingress.
+- `deploy/k8s/overlays/forge`: Forge K3s overlay in `llm-infra` with private-network `MCP_AUTH_MODE=none`, a placeholder Vertex AI secret, and an Istio `VirtualService` for `diagram.arunlabs.com`.
 
 ### 1) Create Secrets
 
-Create a secret with a Gemini API key (pick one key name):
+Create a secret with a Vertex AI API key placeholder:
 
 ```bash
 kubectl apply -f deploy/k8s/base/secret.example.yaml
@@ -44,6 +45,23 @@ Then apply:
 
 ```bash
 kubectl apply -k deploy/k8s/overlays/oidc
+```
+
+### 3) Deploy To Forge K3s
+
+Edit `deploy/k8s/overlays/forge/patch-deployment.yaml` if you want a different base URL.
+Edit `deploy/k8s/overlays/forge/virtualservice.yaml` if you want a different hostname.
+
+Then apply:
+
+```bash
+kubectl apply -k deploy/k8s/overlays/forge
+```
+
+Or use the remote Forge build-and-release script from the repo root:
+
+```bash
+./scripts/release-remote.sh
 ```
 
 ## Client Configuration (Examples)

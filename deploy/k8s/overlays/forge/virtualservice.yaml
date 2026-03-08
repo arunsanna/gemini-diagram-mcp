@@ -1,0 +1,16 @@
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: gemini-diagram-mcp
+spec:
+  hosts:
+    - diagram.arunlabs.com
+  gateways:
+    - istio-system/arunlabs-public-gateway
+  http:
+    - timeout: 180s
+      route:
+        - destination:
+            host: gemini-diagram-mcp.llm-infra.svc.cluster.local
+            port:
+              number: 3000

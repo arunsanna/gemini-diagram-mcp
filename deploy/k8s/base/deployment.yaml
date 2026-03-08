@@ -22,19 +22,17 @@ spec:
             - name: http
               containerPort: 3000
           env:
-            # Required (pick one)
-            - name: GOOGLE_API_KEY
+            # Required: Vertex AI API key (Express Mode / API-key flow)
+            - name: VERTEX_AI_API_KEY
               valueFrom:
                 secretKeyRef:
                   name: gemini-diagram-mcp-secrets
-                  key: GOOGLE_API_KEY
+                  key: VERTEX_AI_API_KEY
                   optional: true
-            - name: GEMINI_API_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: gemini-diagram-mcp-secrets
-                  key: GEMINI_API_KEY
-                  optional: true
+            - name: GOOGLE_GENAI_USE_VERTEXAI
+              value: "true"
+            - name: VERTEX_AI_IMAGE_MODEL
+              value: "gemini-3-pro-image-preview"
 
             # Auth defaults to static token mode. See overlays/oidc for per-user OIDC auth.
             - name: MCP_AUTH_MODE
@@ -73,4 +71,3 @@ spec:
       volumes:
         - name: data
           emptyDir: {}
-

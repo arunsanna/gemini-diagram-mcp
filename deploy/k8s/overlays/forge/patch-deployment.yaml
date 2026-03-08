@@ -1,0 +1,18 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gemini-diagram-mcp
+spec:
+  template:
+    spec:
+      containers:
+        - name: gemini-diagram-mcp
+          # Update this tag after pushing the image that contains the Vertex AI changes.
+          image: registry.arunlabs.com/gemini-diagram-mcp@sha256:bcfc5fc900ff82185ac5e34e35626f0e6defb16e85adc887d830c08d3ddebadc
+          env:
+            - name: MCP_AUTH_MODE
+              value: none
+            - name: MCP_AUTH_TOKEN
+              $patch: delete
+            - name: PUBLIC_BASE_URL
+              value: https://diagram.arunlabs.com

@@ -4,9 +4,10 @@ services:
     ports:
       - "3000:3000"
     environment:
-      # Required (pick one)
-      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      # Required: Vertex AI API key
+      - VERTEX_AI_API_KEY=${VERTEX_AI_API_KEY}
+      - GOOGLE_GENAI_USE_VERTEXAI=true
+      - VERTEX_AI_IMAGE_MODEL=${VERTEX_AI_IMAGE_MODEL:-gemini-3-pro-image-preview}
 
       # Auth (choose one)
       - MCP_AUTH_MODE=${MCP_AUTH_MODE:-token}

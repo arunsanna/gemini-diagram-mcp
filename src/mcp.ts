@@ -343,6 +343,9 @@ export function createGeminiDiagramServer(
             "artistic", "dark theme", "dark mode", "neon", "grunge",
             "minimalist art", "pastel", "sepia", "old-fashioned",
             "rustic", "elegant", "gothic", "comic", "cartoon",
+            "comic book", "comic panel", "manga", "graphic novel",
+            "story panel", "speech bubble", "whiteboard", "marker",
+            "hand-written", "handwritten",
           ];
           if (creativeKeywords.some((kw) => lowerPrompt.includes(kw))) {
             lines.push(
@@ -519,6 +522,31 @@ export function createGeminiDiagramServer(
         "  - Shape vocabulary is auto-injected for architecture/flow types:",
         "    cylinders for databases, pipes for queues, nested boxes for containers,",
         "    diamonds for load balancers, cloud silhouettes for cloud services",
+        "",
+        "COMIC / VISUAL STORY PATTERN (for multi-image storytelling):",
+        "  When the user asks for a story, comic, or sequence of images that tell a narrative:",
+        "  1. PLAN the full story arc FIRST — define all panels before generating any image",
+        "  2. DEFINE recurring characters with specific visual traits (clothing, hair, props)",
+        "     and reference those exact traits in EVERY panel prompt for consistency",
+        "  3. Follow the 3-act structure:",
+        "     - Panel 1 (Setup/Problem): Introduce the character + conflict. Use style: creative",
+        "       with comic aesthetic — bold outlines, speech bubbles, dramatic angles, action lines",
+        "     - Panel 2 (Solution): The technical fix. Can be professional (architecture diagram,",
+        "       whiteboard, blueprint) OR creative depending on the story",
+        "     - Panel 3 (Resolution): The outcome/victory. Same character, same traits, showing",
+        "       the result. Use style: creative to match panel 1",
+        "  4. GENERATE ONE PANEL AT A TIME — review each before generating the next",
+        "  5. Each panel prompt MUST include:",
+        "     - Character description (restate appearance every time for consistency)",
+        "     - Scene setting and mood",
+        "     - Speech/thought bubbles with actual dialogue text",
+        "     - Panel number/title for continuity",
+        "  6. Use the SAME aspect_ratio across all panels (16:9 recommended for comic strips)",
+        "  7. Comic style tips for creative mode:",
+        "     - Bold black outlines, flat colors, halftone dots for classic comic feel",
+        "     - Sound effects as stylized text (CRASH!, BEEP!, ZAP!)",
+        "     - Motion lines, speed streaks, emphasis bursts for action",
+        "     - Consistent panel border style (thick black frame)",
       ];
 
       if (prompt) {
@@ -557,7 +585,9 @@ export function createGeminiDiagramServer(
           "minimalist art", "pastel", "sepia", "old-fashioned",
           "rustic", "elegant", "gothic", "comic", "cartoon",
           "antique", "distressed", "steampunk", "cyberpunk", "noir",
-          "impressionist", "abstract art",
+          "impressionist", "abstract art", "comic book", "comic panel",
+          "manga", "graphic novel", "story panel", "speech bubble",
+          "whiteboard", "marker", "hand-written", "handwritten",
         ];
         const recommendedStyle = creativeHints.some((kw) => lowerForStyle.includes(kw))
           ? "creative"

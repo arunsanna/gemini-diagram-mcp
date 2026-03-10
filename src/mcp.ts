@@ -613,23 +613,63 @@ export function createGeminiDiagramServer(
           ? "creative"
           : "professional";
 
-        sections.push(
-          "",
-          "=== RECOMMENDED CALL ===",
-          "Call generate_image with:",
-          `  prompt: "${prompt}"`,
-          `  type: "${diagramType}"`,
-          `  aspect_ratio: "${aspectRatio}"`,
-          `  size: "${analysis.recommendedSize}"`,
-          `  style: "${recommendedStyle}"`,
-        );
+        // Detect comic/story intent and build a ready-to-use prompt
+        const comicKeywords = [
+          "comic", "comic book", "comic panel", "manga", "graphic novel",
+          "story panel", "cartoon", "speech bubble", "comic strip",
+        ];
+        const isComicIntent = comicKeywords.some((kw) => lowerForStyle.includes(kw));
 
-        if (recommendedStyle === "creative") {
+        if (isComicIntent) {
+          const comicPrompt =
+            `Comic book panel, bold black outlines, flat vibrant colors, halftone dot shading, ` +
+            `thick black comic panel border frame. Same comic art style as a comic strip series. ` +
+            `Developer Alex — short dark hair, round glasses, plain gray hoodie. ` +
+            prompt;
+
           sections.push(
             "",
-            "Note: Creative style detected — aesthetic constraints (white bg, SaaS palette) will be removed.",
-            "Your prompt will drive the visual style directly.",
+            "=== COMIC MODE DETECTED ===",
+            "Your prompt has been enriched with the stock character (Alex) and comic art style preamble.",
+            "",
+            "READY-TO-USE PROMPT (copy this into generate_image):",
+            `  "${comicPrompt}"`,
+            "",
+            "INSTRUCTIONS FOR THE CALLING AGENT:",
+            "  1. Use the ready-to-use prompt above as-is for generate_image",
+            "  2. For multi-panel stories, restate the character line verbatim in every panel:",
+            "     'Developer Alex — short dark hair, round glasses, plain gray hoodie'",
+            "  3. DO NOT add logos, stickers, or text on clothing — they mutate across panels",
+            "  4. Keep the art style preamble identical across all panels for visual consistency",
+            "  5. Use style: creative, aspect_ratio: 16:9 for all comic panels",
+            "",
+            "=== RECOMMENDED CALL ===",
+            "Call generate_image with:",
+            `  prompt: "${comicPrompt}"`,
+            `  type: "hero"`,
+            `  aspect_ratio: "16:9"`,
+            `  size: "${analysis.recommendedSize}"`,
+            `  style: "creative"`,
           );
+        } else {
+          sections.push(
+            "",
+            "=== RECOMMENDED CALL ===",
+            "Call generate_image with:",
+            `  prompt: "${prompt}"`,
+            `  type: "${diagramType}"`,
+            `  aspect_ratio: "${aspectRatio}"`,
+            `  size: "${analysis.recommendedSize}"`,
+            `  style: "${recommendedStyle}"`,
+          );
+
+          if (recommendedStyle === "creative") {
+            sections.push(
+              "",
+              "Note: Creative style detected — aesthetic constraints (white bg, SaaS palette) will be removed.",
+              "Your prompt will drive the visual style directly.",
+            );
+          }
         }
       }
 

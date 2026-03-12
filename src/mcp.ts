@@ -439,6 +439,7 @@ export function createGeminiDiagramServer(
           lastType: last.lastType,
           aspectRatio: last.aspectRatio,
           size: last.size,
+          style: last.style,
         };
 
         const content: Array<

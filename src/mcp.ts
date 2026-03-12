@@ -29,7 +29,7 @@ export const GenerateImageSchema = z.object({
     .string()
     .optional()
     .describe(
-      "Output filename (auto-generated if not provided). In server mode, this is treated as a filename only."
+      "Output filename (auto-generated if not provided). In server mode, this is treated as a filename only.",
     ),
   type: z
     .enum([
@@ -50,7 +50,7 @@ export const GenerateImageSchema = z.object({
     .enum(["16:9", "1:1", "4:3", "3:4", "9:16", "3:2", "2:3", "21:9"])
     .optional()
     .describe(
-      "Image aspect ratio (auto-selected based on type if not specified)"
+      "Image aspect ratio (auto-selected based on type if not specified)",
     ),
   size: z
     .enum(["1K", "2K", "4K"])
@@ -61,12 +61,14 @@ export const GenerateImageSchema = z.object({
     .default("professional")
     .describe(
       "Style mode. 'professional' enforces clean SaaS aesthetic (white bg, standard palette). " +
-      "'creative' removes aesthetic constraints so the prompt drives the look (vintage, retro, dark, artistic, etc.)"
+        "'creative' removes aesthetic constraints so the prompt drives the look (vintage, retro, dark, artistic, etc.)",
     ),
 });
 
 export const RefineImageSchema = z.object({
-  refinement: z.string().describe("Description of changes to make to the last image"),
+  refinement: z
+    .string()
+    .describe("Description of changes to make to the last image"),
 });
 
 export const PrepareImageSchema = z.object({
@@ -74,7 +76,7 @@ export const PrepareImageSchema = z.object({
     .string()
     .optional()
     .describe(
-      "Optional draft prompt to analyze. If provided, returns recommendations and a polished version."
+      "Optional draft prompt to analyze. If provided, returns recommendations and a polished version.",
     ),
   type: z
     .string()
@@ -157,7 +159,7 @@ function resolveOutputPath(
   outputDir: string,
   output: string | undefined,
   prompt: string,
-  opts: { allowAbsoluteOutput: boolean; allowSubdirsInOutput: boolean }
+  opts: { allowAbsoluteOutput: boolean; allowSubdirsInOutput: boolean },
 ): { outputPath: string; filenameForUrl?: string } {
   if (output) {
     if (opts.allowAbsoluteOutput && path.isAbsolute(output)) {
@@ -193,7 +195,7 @@ function isPathInsideRoot(rootDir: string, candidatePath: string): boolean {
 }
 
 export function createGeminiDiagramServer(
-  options: CreateGeminiDiagramServerOptions
+  options: CreateGeminiDiagramServerOptions,
 ): McpServer {
   const outputDir = options.outputDir;
   fs.mkdirSync(outputDir, { recursive: true });
@@ -233,19 +235,16 @@ export function createGeminiDiagramServer(
 
         if (!analysis.shouldProceed && analysis.clarifyingQuestion) {
           return {
-            content: [{ type: "text" as const, text: analysis.clarifyingQuestion }],
+            content: [
+              { type: "text" as const, text: analysis.clarifyingQuestion },
+            ],
           };
         }
 
-        const { outputPath } = resolveOutputPath(
-          outputDir,
-          output,
-          prompt,
-          {
-            allowAbsoluteOutput,
-            allowSubdirsInOutput,
-          }
-        );
+        const { outputPath } = resolveOutputPath(outputDir, output, prompt, {
+          allowAbsoluteOutput,
+          allowSubdirsInOutput,
+        });
 
         const finalType = analysis.recommendedType;
         const finalAspectRatio = analysis.recommendedAspectRatio;
@@ -276,18 +275,24 @@ export function createGeminiDiagramServer(
 
         // Enforce dimension compliance — reject with actionable error so AI retries
         if (result.dimensionWarning) {
-          const dimInfo = result.actualWidth && result.actualHeight
-            ? `${result.actualWidth}x${result.actualHeight}px`
-            : "unknown";
+          const dimInfo =
+            result.actualWidth && result.actualHeight
+              ? `${result.actualWidth}x${result.actualHeight}px`
+              : "unknown";
           // Only delete if this call created the file (don't destroy prior valid files)
           if (result.outputPath && !fileExistedBefore) {
-            try { fs.unlinkSync(result.outputPath); } catch { /* ignore */ }
+            try {
+              fs.unlinkSync(result.outputPath);
+            } catch {
+              /* ignore */
+            }
           }
           return {
             content: [
               {
                 type: "text" as const,
-                text: `IMAGE REJECTED — dimensions do not match request.\n` +
+                text:
+                  `IMAGE REJECTED — dimensions do not match request.\n` +
                   `Requested: ${finalSize} at ${finalAspectRatio} | Received: ${dimInfo}\n` +
                   `${result.dimensionWarning}\n\n` +
                   `ACTION REQUIRED: Retry with a simpler prompt, or adjust size/aspect_ratio parameters to match what the API can deliver.`,
@@ -308,9 +313,10 @@ export function createGeminiDiagramServer(
           style: activeStyle,
         };
 
-        const dimStr = result.actualWidth && result.actualHeight
-          ? ` [${result.actualWidth}x${result.actualHeight}px]`
-          : "";
+        const dimStr =
+          result.actualWidth && result.actualHeight
+            ? ` [${result.actualWidth}x${result.actualHeight}px]`
+            : "";
         const lines: string[] = [
           `Generated ${finalType} (${result.aspectRatio}, ${finalSize}, style: ${activeStyle})${dimStr}`,
           `Saved: ${result.outputPath}`,
@@ -318,11 +324,13 @@ export function createGeminiDiagramServer(
 
         const resultFilename = path.basename(result.outputPath!);
         if (publicBaseUrl && isPathInsideRoot(outputDir, result.outputPath!)) {
-          lines.push(`Download: ${publicBaseUrl}/files/${encodeURIComponent(resultFilename)}`);
+          lines.push(
+            `Download: ${publicBaseUrl}/files/${encodeURIComponent(resultFilename)}`,
+          );
           const authMode = process.env.MCP_AUTH_MODE ?? "token";
           if (authMode === "token") {
             lines.push(
-              "Note: download requires MCP_AUTH_TOKEN (Authorization header or ?token=...)."
+              "Note: download requires MCP_AUTH_TOKEN (Authorization header or ?token=...).",
             );
           } else if (authMode === "oidc") {
             lines.push("Note: download requires an OIDC bearer token.");
@@ -331,7 +339,7 @@ export function createGeminiDiagramServer(
 
         if (analysis.suggestions && analysis.suggestions.length > 0) {
           lines.push(
-            `Note: ${analysis.suggestions.join(". ")}. Use 'type' parameter to override.`
+            `Note: ${analysis.suggestions.join(". ")}. Use 'type' parameter to override.`,
           );
         }
 
@@ -339,18 +347,40 @@ export function createGeminiDiagramServer(
         if (activeStyle === "professional") {
           const lowerPrompt = prompt.toLowerCase();
           const creativeKeywords = [
-            "vintage", "retro", "hand-drawn", "sketch", "watercolor",
-            "artistic", "dark theme", "dark mode", "neon", "grunge",
-            "minimalist art", "pastel", "sepia", "old-fashioned",
-            "rustic", "elegant", "gothic", "comic", "cartoon",
-            "comic book", "comic panel", "manga", "graphic novel",
-            "story panel", "speech bubble", "whiteboard", "marker",
-            "hand-written", "handwritten",
+            "vintage",
+            "retro",
+            "hand-drawn",
+            "sketch",
+            "watercolor",
+            "artistic",
+            "dark theme",
+            "dark mode",
+            "neon",
+            "grunge",
+            "minimalist art",
+            "pastel",
+            "sepia",
+            "old-fashioned",
+            "rustic",
+            "elegant",
+            "gothic",
+            "comic",
+            "cartoon",
+            "comic book",
+            "comic panel",
+            "manga",
+            "graphic novel",
+            "story panel",
+            "speech bubble",
+            "whiteboard",
+            "marker",
+            "hand-written",
+            "handwritten",
           ];
           if (creativeKeywords.some((kw) => lowerPrompt.includes(kw))) {
             lines.push(
               `Tip: Your prompt mentions a creative style. For best results with non-standard aesthetics, ` +
-              `set style: "creative" to remove the professional SaaS constraints (white bg, fixed palette, sans-serif fonts).`
+                `set style: "creative" to remove the professional SaaS constraints (white bg, fixed palette, sans-serif fonts).`,
             );
           }
         }
@@ -376,7 +406,7 @@ export function createGeminiDiagramServer(
           isError: true,
         };
       }
-    }
+    },
   );
 
   server.tool(
@@ -401,12 +431,12 @@ export function createGeminiDiagramServer(
 
         const baseName = path.basename(
           last.lastOutputPath,
-          path.extname(last.lastOutputPath)
+          path.extname(last.lastOutputPath),
         );
         const dir = path.dirname(last.lastOutputPath);
         const refinedPath = path.join(
           dir,
-          `${baseName}_refined_${randomUUID().slice(0, 8)}`
+          `${baseName}_refined_${randomUUID().slice(0, 8)}`,
         );
 
         const result = await client.refine(
@@ -418,7 +448,7 @@ export function createGeminiDiagramServer(
             aspectRatio: last.aspectRatio,
             size: last.size,
             style: last.style,
-          }
+          },
         );
 
         if (!result.success) {
@@ -445,7 +475,9 @@ export function createGeminiDiagramServer(
         const content: Array<
           | { type: "text"; text: string }
           | { type: "image"; data: string; mimeType: string }
-        > = [{ type: "text", text: `Refined image saved: ${result.outputPath}` }];
+        > = [
+          { type: "text", text: `Refined image saved: ${result.outputPath}` },
+        ];
 
         if (inlineImages && result.imageData) {
           content.push({
@@ -463,7 +495,7 @@ export function createGeminiDiagramServer(
           isError: true,
         };
       }
-    }
+    },
   );
 
   server.tool(
@@ -472,7 +504,8 @@ export function createGeminiDiagramServer(
     PrepareImageSchema.shape,
     async ({ prompt, type }) => {
       const supportedTypes = Object.entries(DIAGRAM_TYPES).map(
-        ([name, config]) => `  - ${name}: ${config.composition} (default aspect: ${config.aspectRatio})`
+        ([name, config]) =>
+          `  - ${name}: ${config.composition} (default aspect: ${config.aspectRatio})`,
       );
 
       const supportedRatios = Object.keys(ASPECT_RATIO_VALUES).join(", ");
@@ -575,12 +608,15 @@ export function createGeminiDiagramServer(
           type: type && type !== "auto" ? type : undefined,
         });
 
-        const { prompt: polished, aspectRatio, diagramType } =
-          buildPromptFromContext(prompt, {
-            type: type && type !== "auto" ? type : undefined,
-            aspectRatio: analysis.recommendedAspectRatio,
-            size: analysis.recommendedSize,
-          });
+        const {
+          prompt: polished,
+          aspectRatio,
+          diagramType,
+        } = buildPromptFromContext(prompt, {
+          type: type && type !== "auto" ? type : undefined,
+          aspectRatio: analysis.recommendedAspectRatio,
+          size: analysis.recommendedSize,
+        });
 
         sections.push(
           "",
@@ -595,31 +631,74 @@ export function createGeminiDiagramServer(
         }
 
         if (!analysis.shouldProceed && analysis.clarifyingQuestion) {
-          sections.push("", "CLARIFICATION NEEDED:", analysis.clarifyingQuestion);
+          sections.push(
+            "",
+            "CLARIFICATION NEEDED:",
+            analysis.clarifyingQuestion,
+          );
         }
 
         // Detect if prompt suggests creative style
         const lowerForStyle = prompt.toLowerCase();
         const creativeHints = [
-          "vintage", "retro", "hand-drawn", "sketch", "watercolor",
-          "artistic", "dark theme", "dark mode", "neon", "grunge",
-          "minimalist art", "pastel", "sepia", "old-fashioned",
-          "rustic", "elegant", "gothic", "comic", "cartoon",
-          "antique", "distressed", "steampunk", "cyberpunk", "noir",
-          "impressionist", "abstract art", "comic book", "comic panel",
-          "manga", "graphic novel", "story panel", "speech bubble",
-          "whiteboard", "marker", "hand-written", "handwritten",
+          "vintage",
+          "retro",
+          "hand-drawn",
+          "sketch",
+          "watercolor",
+          "artistic",
+          "dark theme",
+          "dark mode",
+          "neon",
+          "grunge",
+          "minimalist art",
+          "pastel",
+          "sepia",
+          "old-fashioned",
+          "rustic",
+          "elegant",
+          "gothic",
+          "comic",
+          "cartoon",
+          "antique",
+          "distressed",
+          "steampunk",
+          "cyberpunk",
+          "noir",
+          "impressionist",
+          "abstract art",
+          "comic book",
+          "comic panel",
+          "manga",
+          "graphic novel",
+          "story panel",
+          "speech bubble",
+          "whiteboard",
+          "marker",
+          "hand-written",
+          "handwritten",
         ];
-        const recommendedStyle = creativeHints.some((kw) => lowerForStyle.includes(kw))
+        const recommendedStyle = creativeHints.some((kw) =>
+          lowerForStyle.includes(kw),
+        )
           ? "creative"
           : "professional";
 
         // Detect comic/story intent and build a ready-to-use prompt
         const comicKeywords = [
-          "comic", "comic book", "comic panel", "manga", "graphic novel",
-          "story panel", "cartoon", "speech bubble", "comic strip",
+          "comic",
+          "comic book",
+          "comic panel",
+          "manga",
+          "graphic novel",
+          "story panel",
+          "cartoon",
+          "speech bubble",
+          "comic strip",
         ];
-        const isComicIntent = comicKeywords.some((kw) => lowerForStyle.includes(kw));
+        const isComicIntent = comicKeywords.some((kw) =>
+          lowerForStyle.includes(kw),
+        );
 
         if (isComicIntent) {
           const comicPrompt =
@@ -677,7 +756,7 @@ export function createGeminiDiagramServer(
       return {
         content: [{ type: "text" as const, text: sections.join("\n") }],
       };
-    }
+    },
   );
 
   return server;

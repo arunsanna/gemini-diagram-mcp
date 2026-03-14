@@ -8,8 +8,7 @@ spec:
   gateways:
     - istio-system/arunlabs-public-gateway
   http:
-    - timeout: 180s
-      route:
+    - route:
         - destination:
             host: gemini-diagram-mcp.llm-infra.svc.cluster.local
             port:

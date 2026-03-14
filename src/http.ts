@@ -128,8 +128,23 @@ export async function startHttpServer(): Promise<void> {
   }, 60_000); // check every minute
   cleanupInterval.unref();
 
-  // Streamable HTTP transport (recommended)
-  app.all("/mcp", async (req: any, res: any) => {
+  // This server does not emit unsolicited server-side notifications, so it does
+  // not need a standalone GET SSE stream on /mcp. Returning 405 prevents remote
+  // clients from holding an idle long-lived channel that intermediaries may drop.
+  app.get("/mcp", (_req: any, res: any) => {
+    res.setHeader("Allow", "POST, DELETE");
+    res.status(405).json({
+      jsonrpc: "2.0",
+      error: {
+        code: -32000,
+        message: "Method not allowed: standalone GET SSE is not supported",
+      },
+      id: null,
+    });
+  });
+
+  // Streamable HTTP transport (request/response streaming over POST).
+  app.post("/mcp", async (req: any, res: any) => {
     try {
       const sessionId = req.headers["mcp-session-id"] as string | undefined;
       let transport: StreamableHTTPServerTransport;
@@ -201,6 +216,58 @@ export async function startHttpServer(): Promise<void> {
       await transport.handleRequest(req, res, req.body);
     } catch (error) {
       console.error("Error handling /mcp request:", error);
+      if (!res.headersSent) {
+        res.status(500).json({
+          jsonrpc: "2.0",
+          error: { code: -32603, message: "Internal server error" },
+          id: null,
+        });
+      }
+    }
+  });
+
+  app.delete("/mcp", async (req: any, res: any) => {
+    try {
+      const sessionId = req.headers["mcp-session-id"] as string | undefined;
+      if (!sessionId) {
+        res.status(400).json({
+          jsonrpc: "2.0",
+          error: {
+            code: -32000,
+            message: "Bad Request: Mcp-Session-Id header is required",
+          },
+          id: null,
+        });
+        return;
+      }
+
+      const existing = transports[sessionId];
+      if (!existing) {
+        res.status(404).json({
+          jsonrpc: "2.0",
+          error: { code: -32001, message: "Session not found" },
+          id: null,
+        });
+        return;
+      }
+
+      if (!(existing instanceof StreamableHTTPServerTransport)) {
+        res.status(400).json({
+          jsonrpc: "2.0",
+          error: {
+            code: -32000,
+            message:
+              "Bad Request: Session exists but uses a different transport protocol",
+          },
+          id: null,
+        });
+        return;
+      }
+
+      sessionLastActive[sessionId] = Date.now();
+      await existing.handleRequest(req, res, req.body);
+    } catch (error) {
+      console.error("Error handling /mcp DELETE request:", error);
       if (!res.headersSent) {
         res.status(500).json({
           jsonrpc: "2.0",

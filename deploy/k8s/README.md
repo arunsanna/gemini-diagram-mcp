@@ -23,7 +23,7 @@ docker push <registry>/gemini-diagram-mcp:<tag>
 
 - `deploy/k8s/base`: Deployment + Service (static token auth by default).
 - `deploy/k8s/overlays/oidc`: Patches base to use OIDC JWT auth + adds an example Ingress.
-- `deploy/k8s/overlays/forge`: Forge K3s overlay in `llm-infra` with private-network `MCP_AUTH_MODE=none`, a placeholder Vertex AI secret, and an Istio `VirtualService` for `diagram.arunlabs.com`.
+- `deploy/k8s/overlays/forge`: Forge K3s overlay in `llm-infra` with private-network `MCP_AUTH_MODE=none`, a placeholder Vertex AI secret, and an Istio `VirtualService` for `diagram.arunlabs.com`. The route intentionally omits a per-request timeout so MCP streaming connections are not cut off by the gateway.
 
 ### 1) Create Secrets
 

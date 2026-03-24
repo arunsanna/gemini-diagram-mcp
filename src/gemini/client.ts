@@ -24,7 +24,7 @@ import {
 async function withRetry<T>(
   fn: () => Promise<T>,
   maxRetries: number = 3,
-  baseDelayMs: number = 1000
+  baseDelayMs: number = 1000,
 ): Promise<T> {
   let lastError: Error | undefined;
 
@@ -36,16 +36,18 @@ async function withRetry<T>(
 
       // Don't retry on certain errors
       const message = lastError.message.toLowerCase();
-      if (message.includes("invalid api key") ||
-          message.includes("quota") ||
-          message.includes("permission denied")) {
+      if (
+        message.includes("invalid api key") ||
+        message.includes("quota") ||
+        message.includes("permission denied")
+      ) {
         throw lastError;
       }
 
       // Exponential backoff
       if (attempt < maxRetries - 1) {
         const delay = baseDelayMs * Math.pow(2, attempt);
-        await new Promise(resolve => setTimeout(resolve, delay));
+        await new Promise((resolve) => setTimeout(resolve, delay));
       }
     }
   }
@@ -54,9 +56,9 @@ async function withRetry<T>(
 }
 
 const PNG_SIGNATURE = Buffer.from([
-  0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
+  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
 ]);
-const JPEG_SIGNATURE = Buffer.from([0xFF, 0xD8, 0xFF]);
+const JPEG_SIGNATURE = Buffer.from([0xff, 0xd8, 0xff]);
 const GIF87A_SIGNATURE = Buffer.from("GIF87a", "ascii");
 const GIF89A_SIGNATURE = Buffer.from("GIF89a", "ascii");
 const RIFF_SIGNATURE = Buffer.from("RIFF", "ascii");
@@ -79,11 +81,17 @@ function normalizeMimeType(mimeType: string | undefined): string | undefined {
 }
 
 function detectImageFormat(data: Buffer): ImageFormat | null {
-  if (data.length >= PNG_SIGNATURE.length && data.subarray(0, 8).equals(PNG_SIGNATURE)) {
+  if (
+    data.length >= PNG_SIGNATURE.length &&
+    data.subarray(0, 8).equals(PNG_SIGNATURE)
+  ) {
     return IMAGE_FORMATS[0];
   }
 
-  if (data.length >= JPEG_SIGNATURE.length && data.subarray(0, 3).equals(JPEG_SIGNATURE)) {
+  if (
+    data.length >= JPEG_SIGNATURE.length &&
+    data.subarray(0, 3).equals(JPEG_SIGNATURE)
+  ) {
     return IMAGE_FORMATS[1];
   }
 
@@ -114,7 +122,9 @@ function formatFromMimeType(mimeType: string | undefined): ImageFormat | null {
 /**
  * Extract pixel dimensions from a PNG or JPEG buffer.
  */
-function getImageDimensions(data: Buffer): { width: number; height: number } | null {
+function getImageDimensions(
+  data: Buffer,
+): { width: number; height: number } | null {
   // PNG: width at bytes 16-19, height at bytes 20-23 (big-endian in IHDR chunk)
   if (data.length >= 24 && data.subarray(0, 8).equals(PNG_SIGNATURE)) {
     const width = data.readUInt32BE(16);
@@ -126,10 +136,10 @@ function getImageDimensions(data: Buffer): { width: number; height: number } | n
   if (data.length >= 4 && data.subarray(0, 3).equals(JPEG_SIGNATURE)) {
     let offset = 2;
     while (offset < data.length - 9) {
-      if (data[offset] !== 0xFF) break;
+      if (data[offset] !== 0xff) break;
       const marker = data[offset + 1];
       // SOF0 or SOF2
-      if (marker === 0xC0 || marker === 0xC2) {
+      if (marker === 0xc0 || marker === 0xc2) {
         const height = data.readUInt16BE(offset + 5);
         const width = data.readUInt16BE(offset + 7);
         return { width, height };
@@ -162,14 +172,20 @@ export const ASPECT_RATIO_VALUES: Record<string, number> = {
   "21:9": 21 / 9,
 };
 
-function resolveOutputPathForFormat(outputPath: string, format: ImageFormat): string {
+function resolveOutputPathForFormat(
+  outputPath: string,
+  format: ImageFormat,
+): string {
   const parsed = path.parse(outputPath);
 
   if (parsed.ext.toLowerCase() === format.extension) {
     return outputPath;
   }
 
-  return path.join(parsed.dir, `${parsed.name || parsed.base}${format.extension}`);
+  return path.join(
+    parsed.dir,
+    `${parsed.name || parsed.base}${format.extension}`,
+  );
 }
 
 export type StyleMode = "professional" | "creative";
@@ -452,7 +468,8 @@ export function detectTypeWithConfidence(prompt: string): TypeDetection {
       type: "visualization",
       confidence: "low",
       alternativeTypes: ["chart", "flow", "architecture"],
-      reasoning: "No specific type keywords found. Consider specifying: chart, flow, architecture, comparison, timeline, hierarchy, or matrix.",
+      reasoning:
+        "No specific type keywords found. Consider specifying: chart, flow, architecture, comparison, timeline, hierarchy, or matrix.",
     };
   }
 
@@ -497,33 +514,56 @@ export interface PromptAnalysis {
   suggestions?: string[];
 }
 
-export function analyzePrompt(prompt: string, options: GenerateOptions = {}): PromptAnalysis {
+export function analyzePrompt(
+  prompt: string,
+  options: GenerateOptions = {},
+): PromptAnalysis {
   const detection = detectTypeWithConfidence(prompt);
   const typeConfig = DIAGRAM_TYPES[detection.type] || DIAGRAM_TYPES.chart;
 
-  // Check for size hints in prompt
-  let recommendedSize = options.size || "2K";
+  // Check for size hints in prompt — only when caller did not specify an explicit size
   const lower = prompt.toLowerCase();
-  if (lower.includes("presentation") || lower.includes("slide") || lower.includes("4k") || lower.includes("high res")) {
-    recommendedSize = "4K";
-  } else if (lower.includes("thumbnail") || lower.includes("small") || lower.includes("preview")) {
-    recommendedSize = "1K";
+  let recommendedSize = options.size || "2K";
+  if (!options.size) {
+    if (
+      lower.includes("presentation") ||
+      lower.includes("slide") ||
+      lower.includes("4k") ||
+      lower.includes("high res")
+    ) {
+      recommendedSize = "4K";
+    } else if (
+      lower.includes("thumbnail") ||
+      lower.includes("small") ||
+      lower.includes("preview")
+    ) {
+      recommendedSize = "1K";
+    }
   }
 
   // Check for aspect ratio hints
   let recommendedAspectRatio = options.aspectRatio || typeConfig.aspectRatio;
   if (lower.includes("square")) {
     recommendedAspectRatio = "1:1";
-  } else if (lower.includes("wide") || lower.includes("banner") || lower.includes("header")) {
+  } else if (
+    lower.includes("wide") ||
+    lower.includes("banner") ||
+    lower.includes("header")
+  ) {
     recommendedAspectRatio = "16:9";
-  } else if (lower.includes("portrait") || lower.includes("mobile") || lower.includes("story")) {
+  } else if (
+    lower.includes("portrait") ||
+    lower.includes("mobile") ||
+    lower.includes("story")
+  ) {
     recommendedAspectRatio = "9:16";
   }
 
   // Build analysis result
   const analysis: PromptAnalysis = {
     shouldProceed: true,
-    recommendedType: options.type && options.type !== "auto" ? options.type : detection.type,
+    recommendedType:
+      options.type && options.type !== "auto" ? options.type : detection.type,
     recommendedAspectRatio,
     recommendedSize,
   };
@@ -531,14 +571,18 @@ export function analyzePrompt(prompt: string, options: GenerateOptions = {}): Pr
   // Generate clarifying questions for low confidence
   if (detection.confidence === "low" && !options.type) {
     analysis.shouldProceed = false;
-    analysis.clarifyingQuestion = `I'm not certain about the best visualization type. ${detection.reasoning}\n\nWhat type would you prefer?\n${Object.keys(DIAGRAM_TYPES).map(t => `- ${t}: ${DIAGRAM_TYPES[t].composition.split(",")[0]}`).join("\n")}`;
+    analysis.clarifyingQuestion = `I'm not certain about the best visualization type. ${detection.reasoning}\n\nWhat type would you prefer?\n${Object.keys(
+      DIAGRAM_TYPES,
+    )
+      .map((t) => `- ${t}: ${DIAGRAM_TYPES[t].composition.split(",")[0]}`)
+      .join("\n")}`;
   }
 
   // Provide suggestions for medium confidence
   if (detection.confidence === "medium" && !options.type) {
     analysis.suggestions = [
       `Detected: ${detection.type} (${detection.confidence} confidence)`,
-      ...detection.alternativeTypes.map(t => `Alternative: ${t}`),
+      ...detection.alternativeTypes.map((t) => `Alternative: ${t}`),
     ];
   }
 
@@ -577,51 +621,151 @@ const COMPONENT_SHAPE_HINTS: Array<{
   hint: string;
 }> = [
   // Databases — cylinder shape
-  { pattern: /\b(database|datastore|data store)\b/i, category: "database", hint: "render databases as cylinder shapes" },
-  { pattern: /\b(postgres|postgresql|mysql|mariadb)\b/i, category: "database", hint: "render as a cylinder with a recognizable database icon" },
-  { pattern: /\b(mongo|mongodb|dynamodb|cassandra)\b/i, category: "database", hint: "render as a cylinder with a recognizable database icon" },
-  { pattern: /\b(redis)\b/i, category: "cache-db", hint: "render Redis as a cylinder with a cache/speed icon overlay" },
-  { pattern: /\b(elasticsearch|opensearch)\b/i, category: "database", hint: "render as a cylinder with a search icon overlay" },
+  {
+    pattern: /\b(database|datastore|data store)\b/i,
+    category: "database",
+    hint: "render databases as cylinder shapes",
+  },
+  {
+    pattern: /\b(postgres|postgresql|mysql|mariadb)\b/i,
+    category: "database",
+    hint: "render as a cylinder with a recognizable database icon",
+  },
+  {
+    pattern: /\b(mongo|mongodb|dynamodb|cassandra)\b/i,
+    category: "database",
+    hint: "render as a cylinder with a recognizable database icon",
+  },
+  {
+    pattern: /\b(redis)\b/i,
+    category: "cache-db",
+    hint: "render Redis as a cylinder with a cache/speed icon overlay",
+  },
+  {
+    pattern: /\b(elasticsearch|opensearch)\b/i,
+    category: "database",
+    hint: "render as a cylinder with a search icon overlay",
+  },
 
   // Message queues — pipe shape
-  { pattern: /\b(queue|message queue|event bus)\b/i, category: "queue", hint: "render queues as a horizontal pipe with arrow icon" },
-  { pattern: /\b(kafka|rabbitmq|sqs|nats|pulsar)\b/i, category: "queue", hint: "render as a horizontal pipe icon representing a message queue" },
+  {
+    pattern: /\b(queue|message queue|event bus)\b/i,
+    category: "queue",
+    hint: "render queues as a horizontal pipe with arrow icon",
+  },
+  {
+    pattern: /\b(kafka|rabbitmq|sqs|nats|pulsar)\b/i,
+    category: "queue",
+    hint: "render as a horizontal pipe icon representing a message queue",
+  },
 
   // Load balancers
-  { pattern: /\b(load balancer|lb|ingress)\b/i, category: "lb", hint: "render as a splitting-arrows diamond shape" },
-  { pattern: /\b(nginx|haproxy|envoy|traefik)\b/i, category: "lb", hint: "render as a gateway/proxy diamond shape" },
+  {
+    pattern: /\b(load balancer|lb|ingress)\b/i,
+    category: "lb",
+    hint: "render as a splitting-arrows diamond shape",
+  },
+  {
+    pattern: /\b(nginx|haproxy|envoy|traefik)\b/i,
+    category: "lb",
+    hint: "render as a gateway/proxy diamond shape",
+  },
 
   // Containers / orchestration
-  { pattern: /\b(kubernetes|k8s)\b/i, category: "k8s", hint: "render with a container orchestration icon, use nested boxes for pods" },
-  { pattern: /\b(docker)\b/i, category: "container", hint: "render with a container icon, use nested box for containerized services" },
-  { pattern: /\b(container)\b/i, category: "container", hint: "render as a nested box-in-box" },
-  { pattern: /\b(pod)\b/i, category: "pod", hint: "render as a nested box group with multiple containers inside" },
+  {
+    pattern: /\b(kubernetes|k8s)\b/i,
+    category: "k8s",
+    hint: "render with a container orchestration icon, use nested boxes for pods",
+  },
+  {
+    pattern: /\b(docker)\b/i,
+    category: "container",
+    hint: "render with a container icon, use nested box for containerized services",
+  },
+  {
+    pattern: /\b(container)\b/i,
+    category: "container",
+    hint: "render as a nested box-in-box",
+  },
+  {
+    pattern: /\b(pod)\b/i,
+    category: "pod",
+    hint: "render as a nested box group with multiple containers inside",
+  },
 
   // Cloud providers
-  { pattern: /\baws\b/i, category: "cloud", hint: "render AWS services with cloud silhouette icons" },
-  { pattern: /\b(gcp|google cloud)\b/i, category: "cloud", hint: "render GCP services with cloud silhouette icons" },
-  { pattern: /\b(azure)\b/i, category: "cloud", hint: "render Azure services with cloud silhouette icons" },
+  {
+    pattern: /\baws\b/i,
+    category: "cloud",
+    hint: "render AWS services with cloud silhouette icons",
+  },
+  {
+    pattern: /\b(gcp|google cloud)\b/i,
+    category: "cloud",
+    hint: "render GCP services with cloud silhouette icons",
+  },
+  {
+    pattern: /\b(azure)\b/i,
+    category: "cloud",
+    hint: "render Azure services with cloud silhouette icons",
+  },
 
   // Specific cloud services
-  { pattern: /\bs3\b/i, category: "storage", hint: "render S3 as a bucket/storage shape" },
-  { pattern: /\b(lambda|cloud function|serverless)\b/i, category: "serverless", hint: "render serverless functions with a function/event icon" },
+  {
+    pattern: /\bs3\b/i,
+    category: "storage",
+    hint: "render S3 as a bucket/storage shape",
+  },
+  {
+    pattern: /\b(lambda|cloud function|serverless)\b/i,
+    category: "serverless",
+    hint: "render serverless functions with a function/event icon",
+  },
 
   // Caches
-  { pattern: /\b(cache|memcached)\b/i, category: "cache", hint: "render as a cylinder with a lightning bolt overlay" },
-  { pattern: /\bcdn\b/i, category: "cdn", hint: "render as a globe/network distribution icon" },
+  {
+    pattern: /\b(cache|memcached)\b/i,
+    category: "cache",
+    hint: "render as a cylinder with a lightning bolt overlay",
+  },
+  {
+    pattern: /\bcdn\b/i,
+    category: "cdn",
+    hint: "render as a globe/network distribution icon",
+  },
 
   // APIs / gateways
-  { pattern: /\b(api gateway|api)\b/i, category: "api", hint: "render as a hexagonal gateway shape" },
+  {
+    pattern: /\b(api gateway|api)\b/i,
+    category: "api",
+    hint: "render as a hexagonal gateway shape",
+  },
 
   // Users / clients
-  { pattern: /\b(user|end user)\b/i, category: "user", hint: "render as a person silhouette icon" },
-  { pattern: /\b(browser|web client)\b/i, category: "client", hint: "render as a browser window icon" },
+  {
+    pattern: /\b(user|end user)\b/i,
+    category: "user",
+    hint: "render as a person silhouette icon",
+  },
+  {
+    pattern: /\b(browser|web client)\b/i,
+    category: "client",
+    hint: "render as a browser window icon",
+  },
 
   // Monitoring
-  { pattern: /\b(prometheus|grafana|datadog|monitoring)\b/i, category: "monitoring", hint: "render with a dashboard/chart mini-icon" },
+  {
+    pattern: /\b(prometheus|grafana|datadog|monitoring)\b/i,
+    category: "monitoring",
+    hint: "render with a dashboard/chart mini-icon",
+  },
 
   // Infrastructure as code
-  { pattern: /\b(terraform|pulumi)\b/i, category: "iac", hint: "render with an infrastructure-as-code icon" },
+  {
+    pattern: /\b(terraform|pulumi)\b/i,
+    category: "iac",
+    hint: "render with an infrastructure-as-code icon",
+  },
 ];
 
 function detectShapeHints(prompt: string): string[] {
@@ -649,7 +793,12 @@ const SIZE_MAP: Record<string, string> = {
  */
 export function buildPromptFromContext(
   context: string,
-  options: { type?: string; aspectRatio?: string; size?: string; style?: StyleMode } = {}
+  options: {
+    type?: string;
+    aspectRatio?: string;
+    size?: string;
+    style?: StyleMode;
+  } = {},
 ): { prompt: string; aspectRatio: string; diagramType: string } {
   const diagramType = options.type || detectType(context);
   const typeConfig = DIAGRAM_TYPES[diagramType] || DIAGRAM_TYPES.chart;
@@ -661,9 +810,10 @@ export function buildPromptFromContext(
   let technicalBlock = "";
   if (isTechnical) {
     const hints = detectShapeHints(context);
-    const hintsSection = hints.length > 0
-      ? `\nCOMPONENT-SPECIFIC VISUAL TREATMENT:\n${hints.join("\n")}\n`
-      : "";
+    const hintsSection =
+      hints.length > 0
+        ? `\nCOMPONENT-SPECIFIC VISUAL TREATMENT:\n${hints.join("\n")}\n`
+        : "";
     technicalBlock = `${TECHNICAL_DIAGRAM_PROMPT}${hintsSection}`;
   }
 
@@ -716,7 +866,7 @@ export class GeminiImageClient {
 
     if (!key) {
       throw new Error(
-        "VERTEX_AI_API_KEY, GOOGLE_API_KEY, or GOOGLE_CLOUD_API_KEY environment variable required for Vertex AI API-key mode"
+        "VERTEX_AI_API_KEY, GOOGLE_API_KEY, or GOOGLE_CLOUD_API_KEY environment variable required for Vertex AI API-key mode",
       );
     }
 
@@ -734,7 +884,7 @@ export class GeminiImageClient {
   async generate(
     prompt: string,
     outputPath: string,
-    options: GenerateOptions = {}
+    options: GenerateOptions = {},
   ): Promise<GenerationResult> {
     try {
       // Ensure output directory exists
@@ -744,13 +894,16 @@ export class GeminiImageClient {
       }
 
       // Build context-aware prompt with all options embedded
-      const { prompt: enhancedPrompt, aspectRatio, diagramType } =
-        buildPromptFromContext(prompt, {
-          type: options.type === "auto" ? undefined : options.type,
-          aspectRatio: options.aspectRatio,
-          size: options.size,
-          style: options.style,
-        });
+      const {
+        prompt: enhancedPrompt,
+        aspectRatio,
+        diagramType,
+      } = buildPromptFromContext(prompt, {
+        type: options.type === "auto" ? undefined : options.type,
+        aspectRatio: options.aspectRatio,
+        size: options.size,
+        style: options.style,
+      });
 
       // Resolve size to valid imageSize value
       const imageSize = options.size || "2K";
@@ -808,7 +961,10 @@ export class GeminiImageClient {
         declaredFormat?.mimeType === detectedFormat.mimeType
           ? declaredFormat
           : detectedFormat;
-      const finalOutputPath = resolveOutputPathForFormat(outputPath, finalFormat);
+      const finalOutputPath = resolveOutputPathForFormat(
+        outputPath,
+        finalFormat,
+      );
 
       // Extract actual dimensions
       const dims = getImageDimensions(imageData);
@@ -821,12 +977,13 @@ export class GeminiImageClient {
         const expectedRatio = ASPECT_RATIO_VALUES[aspectRatio];
         if (expectedRatio) {
           const actualRatio = actualWidth / actualHeight;
-          const ratioDiff = Math.abs(actualRatio - expectedRatio) / expectedRatio;
+          const ratioDiff =
+            Math.abs(actualRatio - expectedRatio) / expectedRatio;
           if (ratioDiff > 0.15) {
             const actualApprox = `${actualWidth}:${actualHeight}`;
             warnings.push(
               `Aspect ratio mismatch: requested ${aspectRatio} but received ~${actualApprox} (${actualWidth}x${actualHeight}px). ` +
-              `Try a simpler prompt or a different aspect_ratio.`
+                `Try a simpler prompt or a different aspect_ratio.`,
             );
           }
         }
@@ -837,10 +994,11 @@ export class GeminiImageClient {
         const minPixels = SIZE_MIN_PIXELS[imageSize];
         const longestSide = Math.max(actualWidth, actualHeight);
         if (minPixels && longestSide < minPixels) {
-          const actualTier = longestSide >= 3600 ? "4K" : longestSide >= 1800 ? "2K" : "1K";
+          const actualTier =
+            longestSide >= 3600 ? "4K" : longestSide >= 1800 ? "2K" : "1K";
           warnings.push(
             `Resolution mismatch: requested ${imageSize} (>=${minPixels}px) but received ${actualWidth}x${actualHeight}px (${actualTier}). ` +
-            `The Gemini API may cap resolution for complex prompts. Try size="1K" or simplify the prompt.`
+              `The Gemini API may cap resolution for complex prompts. Try size="1K" or simplify the prompt.`,
           );
         }
       }
@@ -859,7 +1017,8 @@ export class GeminiImageClient {
         actualHeight,
         requestedSize: imageSize,
         requestedAspectRatio: aspectRatio,
-        dimensionWarning: warnings.length > 0 ? warnings.join(" | ") : undefined,
+        dimensionWarning:
+          warnings.length > 0 ? warnings.join(" | ") : undefined,
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -877,7 +1036,7 @@ export class GeminiImageClient {
     originalPrompt: string,
     refinement: string,
     outputPath: string,
-    options: GenerateOptions = {}
+    options: GenerateOptions = {},
   ): Promise<GenerationResult> {
     const combinedPrompt = `${originalPrompt}
 

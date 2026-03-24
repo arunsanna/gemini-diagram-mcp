@@ -541,22 +541,24 @@ export function analyzePrompt(
     }
   }
 
-  // Check for aspect ratio hints
+  // Check for aspect ratio hints — only when caller did not specify an explicit ratio
   let recommendedAspectRatio = options.aspectRatio || typeConfig.aspectRatio;
-  if (lower.includes("square")) {
-    recommendedAspectRatio = "1:1";
-  } else if (
-    lower.includes("wide") ||
-    lower.includes("banner") ||
-    lower.includes("header")
-  ) {
-    recommendedAspectRatio = "16:9";
-  } else if (
-    lower.includes("portrait") ||
-    lower.includes("mobile") ||
-    lower.includes("story")
-  ) {
-    recommendedAspectRatio = "9:16";
+  if (!options.aspectRatio) {
+    if (lower.includes("square")) {
+      recommendedAspectRatio = "1:1";
+    } else if (
+      lower.includes("wide") ||
+      lower.includes("banner") ||
+      lower.includes("header")
+    ) {
+      recommendedAspectRatio = "16:9";
+    } else if (
+      lower.includes("portrait") ||
+      lower.includes("mobile") ||
+      lower.includes("story")
+    ) {
+      recommendedAspectRatio = "9:16";
+    }
   }
 
   // Build analysis result

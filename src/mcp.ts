@@ -251,9 +251,7 @@ export function createGeminiDiagramServer(
         const finalSize = analysis.recommendedSize;
 
         const client = getClient();
-        // Track whether the output file existed before generation so we don't
-        // accidentally delete a prior valid file on dimension rejection.
-        const fileExistedBefore = fs.existsSync(outputPath);
+        let dimensionNote = "";
         const result = await client.generate(prompt, outputPath, {
           type: finalType,
           aspectRatio: finalAspectRatio,
@@ -273,33 +271,19 @@ export function createGeminiDiagramServer(
           };
         }
 
-        // Enforce dimension compliance — reject with actionable error so AI retries
+        // Dimension mismatch — warn but keep the image
         if (result.dimensionWarning) {
           const dimInfo =
             result.actualWidth && result.actualHeight
               ? `${result.actualWidth}x${result.actualHeight}px`
               : "unknown";
-          // Only delete if this call created the file (don't destroy prior valid files)
-          if (result.outputPath && !fileExistedBefore) {
-            try {
-              fs.unlinkSync(result.outputPath);
-            } catch {
-              /* ignore */
-            }
-          }
-          return {
-            content: [
-              {
-                type: "text" as const,
-                text:
-                  `IMAGE REJECTED — dimensions do not match request.\n` +
-                  `Requested: ${finalSize} at ${finalAspectRatio} | Received: ${dimInfo}\n` +
-                  `${result.dimensionWarning}\n\n` +
-                  `ACTION REQUIRED: Retry with a simpler prompt, or adjust size/aspect_ratio parameters to match what the API can deliver.`,
-              },
-            ],
-            isError: true,
-          };
+          const longestSide = Math.max(
+            result.actualWidth ?? 0,
+            result.actualHeight ?? 0,
+          );
+          const actualTier =
+            longestSide >= 3600 ? "4K" : longestSide >= 1800 ? "2K" : "1K";
+          dimensionNote = `Note: Requested ${finalSize} but API delivered ${actualTier} (${dimInfo}). Image kept.`;
         }
 
         const activeStyle: StyleMode = style || "professional";
@@ -335,6 +319,10 @@ export function createGeminiDiagramServer(
           } else if (authMode === "oidc") {
             lines.push("Note: download requires an OIDC bearer token.");
           }
+        }
+
+        if (dimensionNote) {
+          lines.push(dimensionNote);
         }
 
         if (analysis.suggestions && analysis.suggestions.length > 0) {

@@ -196,7 +196,10 @@ export interface GenerateOptions {
   aspectRatio?: string;
   size?: string;
   style?: StyleMode;
+  watermark?: string;
 }
+
+export const DEFAULT_WATERMARK = "arunsanna.com";
 
 // Result from image generation
 export interface GenerationResult {
@@ -359,7 +362,8 @@ const TYPE_KEYWORDS: Record<string, string[]> = {
 // ============================================================================
 
 // Base rules applied to ALL styles (sharpness + watermark)
-const BASE_PROMPT_PROFESSIONAL = `RENDERING QUALITY:
+function getBaseProfessionalPrompt(watermark: string): string {
+  return `RENDERING QUALITY:
 - Ultra-sharp edges on all text, lines, icons, and shapes — no blur or anti-aliasing artifacts
 - Crisp 1px borders where borders are used; never fuzzy or semi-transparent
 - All text must be pixel-perfect, fully legible, and never truncated or overlapping
@@ -367,20 +371,23 @@ const BASE_PROMPT_PROFESSIONAL = `RENDERING QUALITY:
 - Vector-quality appearance: clean geometry, precise alignment, no rasterization noise
 
 WATERMARK — THIS IS REQUIRED, DO NOT SKIP:
-- You MUST render the text "arunsanna.com" in the bottom-right corner of the image
+- You MUST render the text "${watermark}" in the bottom-right corner of the image
 - Use light gray color (#94a3b8), small font size (about 10pt), slightly transparent
 - Position it with a small margin from the bottom and right edges
 - This watermark must appear on EVERY generated image without exception`;
+}
 
-const BASE_PROMPT_CREATIVE = `RENDERING QUALITY:
+function getBaseCreativePrompt(watermark: string): string {
+  return `RENDERING QUALITY:
 - All text must be legible and never truncated or overlapping
 - Clean geometry and precise alignment appropriate to the chosen artistic style
 
 WATERMARK — THIS IS REQUIRED, DO NOT SKIP:
-- You MUST render the text "arunsanna.com" in the bottom-right corner of the image
+- You MUST render the text "${watermark}" in the bottom-right corner of the image
 - Use a subtle color that contrasts with the background (light on dark, dark on light), small font size (about 10pt), slightly transparent
 - Position it with a small margin from the bottom and right edges
 - This watermark must appear on EVERY generated image without exception`;
+}
 
 // Professional aesthetic — only applied when style === "professional"
 const PROFESSIONAL_STYLE_PROMPT = `BACKGROUND REQUIREMENTS:
@@ -418,11 +425,14 @@ STYLE:
 - Professional enterprise look
 - Works seamlessly on white web pages`;
 
-function getStylePrompt(style?: StyleMode): string {
+function getStylePrompt(
+  style?: StyleMode,
+  watermark: string = DEFAULT_WATERMARK,
+): string {
   if (style === "creative") {
-    return BASE_PROMPT_CREATIVE;
+    return getBaseCreativePrompt(watermark);
   }
-  return `${PROFESSIONAL_STYLE_PROMPT}\n\n${BASE_PROMPT_PROFESSIONAL}`;
+  return `${PROFESSIONAL_STYLE_PROMPT}\n\n${getBaseProfessionalPrompt(watermark)}`;
 }
 
 // Detection result with confidence
@@ -800,12 +810,14 @@ export function buildPromptFromContext(
     aspectRatio?: string;
     size?: string;
     style?: StyleMode;
+    watermark?: string;
   } = {},
 ): { prompt: string; aspectRatio: string; diagramType: string } {
   const diagramType = options.type || detectType(context);
   const typeConfig = DIAGRAM_TYPES[diagramType] || DIAGRAM_TYPES.chart;
   const aspectRatio = options.aspectRatio || typeConfig.aspectRatio;
   const sizeDesc = SIZE_MAP[options.size || "2K"] || SIZE_MAP["2K"];
+  const watermark = options.watermark || DEFAULT_WATERMARK;
 
   // Inject visual vocabulary + shape hints only for architecture/flow types
   const isTechnical = diagramType === "architecture" || diagramType === "flow";
@@ -819,13 +831,13 @@ export function buildPromptFromContext(
     technicalBlock = `${TECHNICAL_DIAGRAM_PROMPT}${hintsSection}`;
   }
 
-  const stylePrompt = getStylePrompt(options.style);
+  const stylePrompt = getStylePrompt(options.style, watermark);
   const styleLabel = options.style === "creative" ? "" : " professional";
 
   const importantLines = [
     "- Make the visualization clear and immediately understandable",
     `- Maintain the specified ${aspectRatio} aspect ratio precisely`,
-    '- MANDATORY: Include "arunsanna.com" watermark text in the bottom-right corner (light gray, small, subtle)',
+    `- MANDATORY: Include "${watermark}" watermark text in the bottom-right corner (light gray, small, subtle)`,
   ];
   if (options.style !== "creative") {
     importantLines.unshift(
@@ -905,6 +917,7 @@ export class GeminiImageClient {
         aspectRatio: options.aspectRatio,
         size: options.size,
         style: options.style,
+        watermark: options.watermark,
       });
 
       // Resolve size to valid imageSize value

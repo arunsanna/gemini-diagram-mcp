@@ -18,6 +18,7 @@ import {
   DIAGRAM_TYPES,
   ASPECT_RATIO_VALUES,
   buildPromptFromContext,
+  DEFAULT_WATERMARK,
   type StyleMode,
 } from "./gemini/client.js";
 
@@ -62,6 +63,12 @@ export const GenerateImageSchema = z.object({
     .describe(
       "Style mode. 'professional' enforces clean SaaS aesthetic (white bg, standard palette). " +
         "'creative' removes aesthetic constraints so the prompt drives the look (vintage, retro, dark, artistic, etc.)",
+    ),
+  watermark: z
+    .string()
+    .optional()
+    .describe(
+      `Watermark text rendered in the bottom-right corner of the image. Defaults to "${DEFAULT_WATERMARK}".`,
     ),
 });
 
@@ -119,6 +126,7 @@ type LastImageSession = {
   aspectRatio?: string;
   size?: string;
   style?: StyleMode;
+  watermark?: string;
 };
 
 function normalizeBaseUrl(baseUrl: string): string {
@@ -225,7 +233,7 @@ export function createGeminiDiagramServer(
     "generate_image",
     "Generate a diagram, chart, or visualization using Gemini. Intelligently detects type from prompt and asks clarifying questions when uncertain. Supports: chart, comparison, flow, architecture, timeline, hierarchy, matrix, hero, visualization.",
     GenerateImageSchema.shape,
-    async ({ prompt, output, type, aspect_ratio, size, style }) => {
+    async ({ prompt, output, type, aspect_ratio, size, style, watermark }) => {
       try {
         const analysis = analyzePrompt(prompt, {
           type: type === "auto" ? undefined : type,
@@ -257,6 +265,7 @@ export function createGeminiDiagramServer(
           aspectRatio: finalAspectRatio,
           size: finalSize,
           style,
+          watermark,
         });
 
         if (!result.success) {
@@ -295,6 +304,7 @@ export function createGeminiDiagramServer(
           aspectRatio: result.aspectRatio,
           size: finalSize,
           style: activeStyle,
+          watermark,
         };
 
         const dimStr =
@@ -436,6 +446,7 @@ export function createGeminiDiagramServer(
             aspectRatio: last.aspectRatio,
             size: last.size,
             style: last.style,
+            watermark: last.watermark,
           },
         );
 
@@ -458,6 +469,7 @@ export function createGeminiDiagramServer(
           aspectRatio: last.aspectRatio,
           size: last.size,
           style: last.style,
+          watermark: last.watermark,
         };
 
         const content: Array<

@@ -8,7 +8,7 @@ spec:
       containers:
         - name: gemini-diagram-mcp
           # Update this tag after pushing the image that contains the Vertex AI changes.
-          image: registry.arunlabs.com/gemini-diagram-mcp@sha256:e28c1e151fec6cca424cb0bf4a0316e1dee5e10a65448adf0d39ef5b09522d90
+          image: registry.arunlabs.com/gemini-diagram-mcp@sha256:a5088e2b3715768851c57011aa93e3105a3e52f7f18f8ab3660d262bf2e852a9
           env:
             - name: MCP_AUTH_MODE
               value: none

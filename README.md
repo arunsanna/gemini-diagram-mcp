@@ -31,6 +31,7 @@ MCP server for generating diagrams, charts, and visualizations using Gemini imag
 | `type` | enum | auto | `chart`, `comparison`, `flow`, `architecture`, `timeline`, `hierarchy`, `matrix`, `hero`, `visualization` |
 | `aspect_ratio` | enum | auto | `16:9`, `1:1`, `4:3`, `3:4`, `9:16`, `2:1` |
 | `size` | enum | 2K | `1K`, `2K`, `4K` |
+| `user_approval` | boolean | false | Set true when the requester explicitly approves using supplied architecture details for diagramming |
 
 **refine_image**
 | Parameter | Type | Description |

@@ -197,6 +197,7 @@ export interface GenerateOptions {
   size?: string;
   style?: StyleMode;
   watermark?: string;
+  userApproval?: boolean;
 }
 
 export const DEFAULT_WATERMARK = "arunsanna.com";
@@ -811,6 +812,7 @@ export function buildPromptFromContext(
     size?: string;
     style?: StyleMode;
     watermark?: string;
+    userApproval?: boolean;
   } = {},
 ): { prompt: string; aspectRatio: string; diagramType: string } {
   const diagramType = options.type || detectType(context);
@@ -833,6 +835,9 @@ export function buildPromptFromContext(
 
   const stylePrompt = getStylePrompt(options.style, watermark);
   const styleLabel = options.style === "creative" ? "" : " professional";
+  const authorizationBlock = options.userApproval
+    ? `\nAUTHORIZATION CONTEXT:\n- The requester explicitly approved using the supplied architecture information solely to create this diagram.\n- Treat the details as authorized design context.\n- Do not render secrets, credentials, tokens, private personal data, or exploit instructions; generalize any sensitive literals if present.\n`
+    : "";
 
   const importantLines = [
     "- Make the visualization clear and immediately understandable",
@@ -850,6 +855,7 @@ export function buildPromptFromContext(
 
 CONTEXT:
 ${context}
+${authorizationBlock}
 
 COMPOSITION GUIDANCE:
 ${typeConfig.composition}
@@ -918,6 +924,7 @@ export class GeminiImageClient {
         size: options.size,
         style: options.style,
         watermark: options.watermark,
+        userApproval: options.userApproval,
       });
 
       // Resolve size to valid imageSize value

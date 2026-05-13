@@ -6,7 +6,7 @@ spec:
   hosts:
     - diagram.arunlabs.com
   gateways:
-    - istio-system/arunlabs-public-gateway
+    - istio-system/arunlabs-private-gateway
   http:
     - route:
         - destination:

@@ -11,6 +11,7 @@ import { z } from "zod";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { randomUUID } from "node:crypto";
+import { pathToFileURL } from "node:url";
 
 import {
   GeminiImageClient,
@@ -232,6 +233,10 @@ export function createGeminiDiagramServer(
   const inlineImages = options.inlineImages ?? false;
   const allowAbsoluteOutput = options.allowAbsoluteOutput ?? true;
   const allowSubdirsInOutput = options.allowSubdirsInOutput ?? true;
+  const imagePreviewText = (outputPath: string): string =>
+    allowAbsoluteOutput
+      ? `\n[Open image](<${pathToFileURL(outputPath).href}>)\nInclude the Open image link in your reply.`
+      : "";
   const publicBaseUrl = options.publicBaseUrl
     ? normalizeBaseUrl(options.publicBaseUrl)
     : undefined;
@@ -331,7 +336,7 @@ export function createGeminiDiagramServer(
             : "";
         const lines: string[] = [
           `Generated ${finalType} (${result.aspectRatio}, ${finalSize}, style: ${activeStyle})${dimStr}`,
-          `Saved: ${result.outputPath}`,
+          `Saved: ${result.outputPath}${imagePreviewText(result.outputPath!)}`,
         ];
 
         const resultFilename = path.basename(result.outputPath!);
@@ -496,7 +501,10 @@ export function createGeminiDiagramServer(
           | { type: "text"; text: string }
           | { type: "image"; data: string; mimeType: string }
         > = [
-          { type: "text", text: `Refined image saved: ${result.outputPath}` },
+          {
+            type: "text",
+            text: `Refined image saved: ${result.outputPath}${imagePreviewText(result.outputPath!)}`,
+          },
         ];
 
         if (inlineImages && result.imageData) {
